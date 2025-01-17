@@ -267,12 +267,18 @@ The basic idea is the following:
    footprint of each device when a common set of attributes and capacities can
    be applied. The mixins themselves are introduced as a list of top-level
    objects directly next to the list of `Devices` inside a `ResourceSlice`.
-   They are not allocatable on their own.
+   They are not allocatable on their own. Entries in the `Includes` list can
+   only reference mixins in the same `ResourceSlice`. References to
+   mixins in other ResourceSlices are not allowed.
 
 1. The `ConsumesCapacityFrom` field contains a list of *other* devices where the
    capacity of the current device should be consumed if the scheduler decides
-   to allocate it. This essentially removes that capacity from any referenced
-   devices, rendering them unallocatable on their own.
+   to allocate it. For the first version of this feature, only a single entry
+   is allowed in this list. An entry in the `ConsumesCapacityFrom` list 
+   essentially removes that capacity from any referenced devices,
+   rendering them unallocatable on their own. Only devices in the same
+   `ResourceSlice` can be referenced in the `ConsumesCapacityFrom` list.
+   References to devices in other ResourceSlices are not allowed.
 
 With these additions in place, the scheduler has everything it needs to support
 the dynamic allocation of both full devices and their (possibly overlapping)
@@ -385,11 +391,16 @@ type CompositeDevice struct {
 	//
 	// The propertes of each included mixin are applied to this device in
 	// order. Conflicting properties from multiple mixins are taken from the
-	// last mixin listed that contains them.
+	// last mixin listed that contains them. Properties set on the device will
+	// always override properties from mixins.
+	//
+	// The mixins referenced here must be defined in the same
+	// ResourceSlice.
 	//
 	// The maximum number of mixins that can be included is 8.
 	//
 	// +optional
+	// +listType=atomic
 	Includes []DeviceMixinRef `json:"includes,omitempty"`
 
 	// ConsumesCapacityFrom defines the set of devices where any capacity
@@ -400,9 +411,13 @@ type CompositeDevice struct {
 	// Conflicting capacities from multiple devices are taken from the
 	// last device listed that contains them.
 	//
-	// The maximum number of devices that can be referenced is 8.
+	// The devices referenced here must be defined in the same ResourceSlice.
+	//
+	// Only a single entry is allowed in the list. The API exposes this as
+	// a list so this constraint might be relaxed in the future.
 	//
 	// +optional
+	// +listType=atomic
 	ConsumesCapacityFrom []DeviceRef `json:"consumesCapacityFrom,omitempty"`
 
 	// Attributes defines the set of attributes for this device.
@@ -618,7 +633,7 @@ follows:
     "sink" of capacity, pulling from "source" devices in order to satisfy its
     own capacity when allocated.
 
-The scheduler must track the available capacity from all "source" devices, and
+The scheduler must track the availability of the "source" device, and
 pull from it whenever it decides to allocate a "sink" device.
 
 So long as no other devices have been allocated that reference a given "source"
@@ -626,28 +641,38 @@ device in their `ConsumesCapacityField`, it is free to be allocated by the
 scheduler. However, as soon as its capacity has been pulled down by any given
 "sink" device, it can no longer be allocated until its capacity is freed again.
 
-Likewise, so long as all of the advertised capacity of a "sink" device can be
-satisfied by the set of "source" devices it references in its
-`ConsumesCapacityFrom` field, it is free to be allocated by the scheduler.
-However, if any of its advertised capacity cannot be satisfied by one of its
-referenced "source" devices, then it cannot be allocated until that capacity is
-freed by some other device.
+Likewise, a "sink" device can be allocated if it's "source" device is available.
 
-Note that in order to support nested partitioning, a "sink" device *may*
-provide a reference to another "sink" device in its `ConsumesCapacityFrom`
-field, so long as:
+The devices can be nested, meaning that the same device might be a sink for
+one device and a source for another device. No cycles is allowed, so the
+final device in a chain formed by the `ConsumesCapacityFrom` fields must
+always be a "source" device.
 
-1. Each device along the recursive chain of references is able to pull enough
-   capacity from the devices in its own `ConsumesCapacityFrom` list to satisfy
-   its allocation.
+Since the number of entries in the `ConsumesCapacityFrom` list will currently
+be constrained to one, it means a single "sink" device can only pull capacity
+from a single "source" device. In practice this means that the hiararchy of
+"sink" devices under a single "source" device must always form a tree.
 
-1. The final device in the chain is a "source" device.
+During the allocation process, it will no longer be sufficient for the scheduler
+to just check if a device itself is allocated. For a device to be allocatable, the
+following has to be true:
+* All "source" devices from the current device to the root of the tree by following
+  the entries in the `ConsumesCapacityFrom` field, must be allocatable.
+* All "sink" devices in the subtree underneath the current devices must be
+  allocatable.
 
-When such a device is allocated, the scheduler will need to track the full
-capacity required to satisfy each of the sink devices along the chain. In this
-way, all intermediate sink devices will essentially be rendered
-"unschedulable", with the last-level sink device pulling its capacity from the
-devices it references directly.
+In other words, the scheduler needs to make sure that no resources that are a
+partition of the current one is already allocated, and that any resources of
+which the current device is a partition has been allocated.
+
+This is pretty straightforward to implement, simply by traversing the subtree
+under the current device and then walking the `ConsumesCapacityFrom` references
+up to the final "source" device.
+
+Since the `ConsumesCapacityFrom` field is a list, we can allow more than one
+"source" device in the future. However, that is more complicated both to
+implement and for users to understand. Whether it will happen depends on
+whether there are compelling use-cases and the priority of supporting those.
 
 ### Putting it all together for the MIG use-case
 
