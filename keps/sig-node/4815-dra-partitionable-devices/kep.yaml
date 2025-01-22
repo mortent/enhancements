@@ -2,6 +2,7 @@ title: DRA Partitionable Devices
 kep-number: 4815
 authors:
   - "@klueska"
+  - "@mortent"
 owning-sig: sig-node
 participating-sigs:
   - sig-scheduling
