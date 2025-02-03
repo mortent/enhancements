@@ -76,7 +76,7 @@ partitions to be created on demand. This leads to increased resource
 utilization as the size of each partitioned device can be matched in real-time
 to the workload requesting it.
 
-Devices represented in DRA doesn't necessarily have to be a single unit connected
+Devices represented in DRA don't necessarily have to be a single unit connected
 to a single machine, but can also be a logical device comprised of multiple devices
 connected to multiple machines. Similar to the single device partitioning, users
 might require either the full multi-host device or a subset.
@@ -101,9 +101,11 @@ allocated, rather than requiring them to be created before.
 
 ## Motivation
 
-We have two primary motivating examples for supporting partitionable devices
-with DRA. The first is for partitioning a single GPU into smaller partitions, while
-the second is multi-host scheduling of interconnected TPUs.
+We have several motivating examples for supporting partitionable devices
+with DRA, with the first two described in detail in this document:
+* Partitioning a single GPU into smaller partitions.
+* Multi-host scheduing of interconnected TPUs.
+* RDMA
 
 ### Dynamic allocation of Multi-Instance GPUs (MIG) on NVIDIA hardware
 MIG devices are represented as fixed-size partitions
@@ -747,7 +749,9 @@ device it references directly.
 ### Defining multi-host devices
 
 An example of a small 4x4 TPU slice with its partitions will look like the
-following:
+example below. Since the devices in the slice is connected to multiple nodes,
+it will typically be the responsibility of a central controller to publish the
+ResourceSlice.
 
 ```yaml
 kind: ResourceSlice
@@ -847,18 +851,21 @@ of the larger one, and as described in the previous section, this will
 allow the scheduler to understand that allocating a partition of a device has
 the consequence of making other partitions unvailable.
 
-When a multi-host device is requested, the workload must have a number of pods
-that equals the number of nodes that make up the device. These pods will share
-the device, so they must be set up with a shared ResourceClaim. When the scheduler
-attempts to schedule the first pod for the workload, it will find a device that
-matches the request and allocate it for the ResourceClaim. Once the a device has
-been allocated for the claim, this also restricts the nodes where other pods using
-the device can be scheduled. To make sure that future pods do get scheduled on an
-eligible node, the scheduler will use `nodeName` or `nodeSelector` value from the
-device to determine the `nodeSelector` field on the `AllocationResult`
-in the `ResourceClaim`, rather than the `nodeName` or `nodeSelector` from the
-`ResourceSlice`. This makes sure that all pods sharing the `ResourceClaim` will
-be scheduled to the nodes that make up the device.
+In the typical case, when a multi-host device is requested, the workload would
+have a number of pods that equals the number of nodes that make up the device.
+These pods will share the device, so they must be set up with a shared
+ResourceClaim. When the scheduler attempts to schedule the first pod for the
+workload, it will find a device that matches the request and allocate it for the
+ResourceClaim. Once the a device has been allocated for the claim, this also
+restricts the nodes where future pods using the device can be scheduled. To make
+sure that future pods will only be attempted for scheduleding on eligible nodes, the
+scheduler will use `nodeName` or `nodeSelector` value from the device to determine the
+`nodeSelector` field on the `AllocationResult` in the `ResourceClaim`, rather
+than the `nodeName` or `nodeSelector` from the `ResourceSlice`. This makes sure
+that pods sharing the `ResourceClaim` can not get scheduled on nodes that aren't
+part of the device. However, there is no guarantee that they can get scheduled on
+the nodes that make up the device, since that will be subject to any other
+contstraints (like sufficient CPU and memory) during the scheduling process.
 
 
 ### Putting it all together for the MIG use-case
