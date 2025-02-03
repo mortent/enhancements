@@ -105,7 +105,7 @@ We have several motivating examples for supporting partitionable devices
 with DRA, with the first two described in detail in this document:
 * Partitioning a single GPU into smaller partitions.
 * Multi-host scheduing of interconnected TPUs.
-* RDMA
+* SR-IOV
 
 ### Dynamic allocation of Multi-Instance GPUs (MIG) on NVIDIA hardware
 MIG devices are represented as fixed-size partitions
