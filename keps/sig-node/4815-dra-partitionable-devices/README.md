@@ -295,176 +295,236 @@ The exact set of proposed API changes can be seen below:
 ```go
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 type ResourceSliceSpec struct {
-	...
+  ...
 
-	// DeviceMixins represents a list of device mixins, i.e. a collection of
-	// shared attributes and capacities that an actual device can "include"
-	// to extend the set of attributes and capacities it already defines.
-	//
-	// The main purposes of these mixins is to reduce the memory footprint
-	// of devices since they can reference the mixins provided here rather
-	// than duplicate them.
-	//
-	// The total number of mixins, basic devices, and composite devices must be
-	// less than 128.
-	//
-	// +optional
-	// +listType=atomic
-	DeviceMixins []DeviceMixin `json:"deviceMixins,omitempty"`
+  // DeviceMixins represents a list of device mixins, i.e. a collection of
+  // shared attributes and capacities that an actual device can "include"
+  // to extend the set of attributes and capacities it already defines.
+  //
+  // The main purposes of these mixins is to reduce the memory footprint
+  // of devices since they can reference the mixins provided here rather
+  // than duplicate them.
+  //
+  // The total number of mixins, basic devices, and composite devices must be
+  // less than 128.
+  //
+  // +optional
+  // +listType=atomic
+  DeviceMixins []DeviceMixin
+
+  // SharedCapacity defines a list of advertised capacities. These
+  // are not allocatable by themselves, but is referenced by devices
+  // defined in the ResourceSlice and consumed when the device is
+  // allocated.
+  //
+  // The maximum number of shared capacities is 128.
+  //
+  // +optional
+  // listType=atomic
+  SharedCapacity []SharedCapacityEntry
 }
 
 // DeviceMixin defines a specific device mixin for each device type.
 // Besides the name, exactly one field must be set.
 type DeviceMixin struct {
-	// Name is a unique identifier among all mixins managed by the driver
-	// in the pool. It must be a DNS label.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name is a unique identifier among all mixins managed by the driver
+  // in the pool. It must be a DNS label.
+  //
+  // +required
+  Name string
 
-	// Composite defines a mixin usable by a composite device.
-	//
-	// +optional
-	// +oneOf=deviceMixinType
-	Composite *CompositeDeviceMixin `json:"composite,omitempty"`
+  // Composite defines a mixin usable by a composite device.
+  //
+  // +optional
+  // +oneOf=deviceMixinType
+  Composite *CompositeDeviceMixin
 }
 
 // CompositeDeviceMixin defines a mixin that a composite device can include.
 type CompositeDeviceMixin struct {
-	// Attributes defines the set of attributes for this mixin.
-	// The name of each attribute must be unique in that set.
-	//
-	// To ensure this uniqueness, attributes defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting attributes from those provided via other mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+  // Attributes defines the set of attributes for this mixin.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Attributes map[QualifiedName]DeviceAttribute
 
-	// Capacity defines the set of capacities for this mixin.
-	// The name of each capacity must be unique in that set.
-	//
-	// To ensure this uniqueness, capacities defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting capacities from those provided via other mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
+
+  // SharedCapacityConsumed defines a list of references to
+  // shared capacities defined in the same ResourceSlice. Each
+  // of the references points to a named shared capacity and
+  // includes the quantity of that capacity that the devices
+  // using this mixin will need.
+  //
+  // During allocation, a device can only be allocated if
+  // sufficient shared capacity is available to meet the
+  // capacity needed by all the references provided.
+  //
+  // Any capacity references here will be overridden by references
+  // defined in the device.
+  //
+  // The maximum number of consumed capacities is 32.
+  //
+  // +optional
+  SharedCapacityConsumed []CapacityConsumedRef 
 }
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 // +k8s:deepcopy-gen=true
 type Device struct {
-	// Name is unique identifier among all devices managed by
-	// the driver in the pool. It must be a DNS label.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name is unique identifier among all devices managed by
+  // the driver in the pool. It must be a DNS label.
+  //
+  // +required
+  Name string
 
-	// Basic defines one device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Basic *BasicDevice
+  // Basic defines one device instance.
+  //
+  // +optional
+  // +oneOf=deviceType
+  Basic *BasicDevice
 
-	// Composite defines one composite device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Composite *CompositeDevice `json:"composite,omitempty"`
+  // Composite defines one composite device instance.
+  //
+  // +optional
+  // +oneOf=deviceType
+  Composite *CompositeDevice
 }
 
 // CompositeDevice defines one device instance.
 type CompositeDevice struct {
-	// Includes defines the set of device mixins that this device includes.
-	//
-	// The propertes of each included mixin are applied to this device in
-	// order. Conflicting properties from multiple mixins are taken from the
-	// last mixin listed that contains them. Properties set on the device will
-	// always override properties from mixins.
-	//
-	// The mixins referenced here must be defined in the same
-	// ResourceSlice.
-	//
-	// The maximum number of mixins that can be included is 8.
-	//
-	// +optional
-	// +listType=atomic
-	Includes []DeviceMixinRef `json:"includes,omitempty"`
+  // Includes defines the set of device mixins that this device includes.
+  //
+  // The propertes of each included mixin are applied to this device in
+  // order. Conflicting properties from multiple mixins are taken from the
+  // last mixin listed that contains them. Properties set on the device will
+  // always override properties from mixins.
+  //
+  // The mixins referenced here must be defined in the same
+  // ResourceSlice.
+  //
+  // The maximum number of mixins that can be included is 8.
+  //
+  // +optional
+  // +listType=atomic
+  Includes []DeviceMixinRef
 
-	// ConsumesCapacityFrom defines the set of devices where any capacity
-	// consumed by this device should be pulled from. This applies recursively.
-	// In cases where the device names itself as its source, the recursion is
-	// halted.
-	//
-	// Conflicting capacities from multiple devices are taken from the
-	// last device listed that contains them.
-	//
-	// The devices referenced here must be defined in the same ResourceSlice.
-	//
-	// Only a single entry is allowed in the list. The API exposes this as
-	// a list so this constraint might be relaxed in the future.
-	//
-	// +optional
-	// +listType=atomic
-	ConsumesCapacityFrom []DeviceRef `json:"consumesCapacityFrom,omitempty"`
+  // Attributes defines the set of attributes for this device.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Attributes map[QualifiedName]DeviceAttribute
 
-	// Attributes defines the set of attributes for this device.
-	// The name of each attribute must be unique in that set.
-	//
-	// To ensure this uniqueness, attributes defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting attributes from those provided via mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
 
-	// Capacity defines the set of capacities for this device.
-	// The name of each capacity must be unique in that set.
-	//
-	// To ensure this uniqueness, capacities defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting capacities from those provided via mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
+  // SharedCapacityConsumed defines a list of references to
+  // shared capacities defined in the same ResourceSlice. Each
+  // of the references points to a named shared capacity and
+  // includes the quantity of that capacity that the devices
+  // needs.
+  //
+  // During allocation, a device can only be allocated if
+  // sufficient shared capacity is available to meet the
+  // capacity needed by all the references provided.
+  //
+  // Any capacity references here will override references
+  // defined in any mixins.
+  //
+  // The maximum number of consumed capacities is 32.
+  //
+  // +required
+  SharedCapacityConsumed []CapacityConsumedRef
 }
 
 // DeviceMixinRef defines a reference to a device mixin.
 type DeviceMixinRef struct {
-	// Name refers to the name of a device mixin in the pool.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name refers to the name of a device mixin in the pool.
+  //
+  // +required
+  Name string
 }
 
-// DeviceRef defines a reference to a device.
-type DeviceRef struct {
-	// Name refers to the name of a device in the pool.
-	//
-	// +required
-	Name string `json:"name"`
+// CapacityConsumedRef defines a reference from a device to
+// a shared capacity.
+type CapacityConsumedRef struct {
+  // Name defines the name of the shared capacity that
+  // is being referenced.
+  //
+  // Name must be unique for the references from a single
+  // device, but multiple devices can reference the same
+  // shared capacity.
+  //
+  // +required
+  Name string
+
+  // Capacity defines the capacity that is required by
+  // the device.
+  //
+  // +required
+  Capacity resource.Quantity
+}
+
+// SharedCapacityEntry defines a shared capacity that is
+// available for use by devies in this ResourceSlice.
+type SharedCapacityEntry struct {
+  // Name is the name of a capacity.
+  //
+  // The name must be unique for all shared capacities in
+  // a ResourceSlice.
+  //
+  // +required
+  Name string
+
+  // Capacity defines the capacity that is available to
+  // be used by devices.
+  //
+  // +required
+  Capacity resource.Quantity
 }
 ```
 
@@ -483,6 +543,11 @@ A simple example the defines a set of mixins and includes them in the
 definition of 4 NVIDIA A100 GPUs can be seen below:
 
 ```yaml
+sharedCapacity:
+- capacity: 5
+  name: gpu-1-processors
+- capacity: 20Gi
+  name: gpu-1-memory
 deviceMixins:
 - name: system-attributes
   composite:
@@ -505,10 +570,11 @@ deviceMixins:
       cudaComputeCapability:
         version: 8.0.0
 - name: common-gpu-capacities
-  composite:
-    capacity:
-      memory:
-        quantity: 40Gi
+  sharedCapacityConsumed:
+  - capacity: 5Gi
+    name: gpu-1-processors
+  - capacity: 1
+    name: gpu-1-memory
 devices:
 - name: gpu-0
   composite:
@@ -581,40 +647,45 @@ to define multiple, allocatable partitions of a single overarching device can be
 seen below.
 
 ```yaml
+sharedCapacity:
+- capacity: 40Gi
+  name: gpu-0-memory
 devices:
 - name: gpu-0
   composite:
     capacity:
-      memory:
-        quantity: 40Gi
+      memory: 40Gi
+    sharedCapacityConsumed:
+    - capacity: 40Gi
+      name: gpu-0-memory
 - name: gpu-0-partition-0
   composite:
     capacity:
-      memory:
-        quantity: 10Gi
-    consumesCapacityFrom:
-    - name: gpu-0
+      memory: 10Gi
+    sharedCapacityConsumed:
+    - capacity: 10Gi
+      name: gpu-0-memory
 - name: gpu-0-partition-1
   composite:
     capacity:
-      memory:
-        quantity: 10Gi
-    consumesCapacityFrom:
-    - name: gpu-0
+      memory: 10Gi
+    sharedCapacityConsumed:
+    - capacity: 10Gi
+      name: gpu-0-memory
 - name: gpu-0-partition-2
   composite:
     capacity:
-      memory:
-        quantity: 10Gi
-    consumesCapacityFrom:
-    - name: gpu-0
+      memory: 10Gi
+    sharedCapacityConsumed:
+    - capacity: 10Gi
+      name: gpu-0-memory
 - name: gpu-0-partition-3
   composite:
     capacity:
-      memory:
-        quantity: 10Gi
-    consumesCapacityFrom:
-    - name: gpu-0
+      memory: 10Gi
+    sharedCapacityConsumed:
+    - capacity: 10Gi
+      name: gpu-0-memory
 ```
 
 In this example, five devices are defined: a full GPU called "gpu-0" and four
