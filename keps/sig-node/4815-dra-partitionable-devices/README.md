@@ -8,7 +8,7 @@
   - [Non-Goals](#non-goals)
 - [Proposal](#proposal)
 - [Design Details](#design-details)
-  - [Extending a device with as set of mixins](#extending-a-device-with-as-set-of-mixins)
+  - [Extending device and capacity pool with a set of mixins](#extending-device-and-capacity-pool-with-a-set-of-mixins)
   - [Defining device partitions in terms of consumed capacity in a composite device](#defining-device-partitions-in-terms-of-consumed-capacity-in-a-composite-device)
   - [Putting it all together for the MIG use-case](#putting-it-all-together-for-the-mig-use-case)
   - [Test Plan](#test-plan)
@@ -252,26 +252,27 @@ non-goals of this KEP.
 
 ## Proposal
 
-On a high level, this proposal introduces two new concepts:
+On a high level, this proposal is based around two new concepts:
 
-1. Introduce the concept of a Capacity Pool for sharing capacity among
-   partitions of a single physical device. Drivers/controllers will typically
-   create a pool that specifies all the capacities of a physical device and then
-   define the logical devices available for DRA. The logical devices will
-   define how much capacity will consume from the capacity pool, and separately
-   specify the capacity published for the logical device. During allocation,
-   a device can only be allocated if the pool has sufficient free capacity to
-   match what the device needs.
+1. Capacity pool, which is a construct for defining the capacities available for
+   sharing among partitions of a single physical device. Drivers/controllers will
+   typically create a capacity pool that specifies all the available capacities of
+   a physical device and then define the partitions available for DRA. Each
+   partition will specify how much capacity it will consume from the capacity
+   pool, which allows the scheduler to keep track of available capacity in
+   a pool and decide whether a partition can be allocated. A device will
+   separatly set the capacities that is published for the partition.
 
-1. Introduce the concept of mixins, which will devices and resource pools
-   can reference to extend the properties they define explicitly. The goal
-   is to reduce the duplication and overall footprint of `ResourceSlices`.
+1. Mixins, which allows devices and resource pools to reference a mixin
+   object that defines some properties and that when used, will extend the properties
+   they define explicitly on the device or resource pool. The objective is to reduce
+   the duplication and overall footprint of `ResourceSlices`.
 
 
 The implementation of these concepts requires several changes to the
 ResourceSlice API:
 
-1. Introduce three new fields on the `ResourceSliceSpec`. First, `SharedCapacityPools`
+1. It introduces three new fields on the `ResourceSliceSpec`. First, `SharedCapacityPools`
    defines a list of `CapacityPools`, each of which defines a set of capacities
    that devices can draw from. `CapacityPoolMixins` and `DeviceMixins` defines mixins
    for capacity pools and devices.
@@ -279,31 +280,30 @@ ResourceSlice API:
 1. The `SharedCapacityPools` field is a list of named `CapacityPool`s. Each
    defines a set of capacities that is available for devices. This makes it possible
    to define overlapping partitions of devices, while still making sure that no
-   devices can be allocated if the necessary capacity is not available. A `CapacityPool`
+   device can be allocated if the necessary capacity is not available. A `CapacityPool`
    can optionally reference one or more `CapacityPoolMixin`s using the `Includes` field
-   to extend the set of capacities it defines specifically.
+   to extend the set of capacities it defines explicitly.
 
 1. The `CapacityPoolMixins` field defines a list of named `CapacityPoolMixin`s. These
    define a set of capacities that can be used to extend the capacities explicitly
-   defined in a `CapacityPool`. This allows for reducing duplication if there are many
+   defined in a `CapacityPool`. This allows for reduced duplication if there are many
    identical physical devices that must be represented as capacity pools. Mixins
    can not be refrenced directly by devices.
 
-1. The `DeviceMixins` field is a list of names `CompositeDeviceMixin`s. These define
+1. The `DeviceMixins` field is a list of named `CompositeDeviceMixin`s. These define
    attributes, capacities and consumed capacities that can be used to extend
    what is defined explicitly in a `CompositeDevice`. The references to
    consumed capacities in the `SharedCapacityConsumed` does not include the
-   pool, but instead require that the pool is specified as part of the reference
-   from the device to the `CompositeDeviceMixin`. This allows the same mixin
-   to be used across different capacity pools. Mixins can not be allocated directly,
-   but can only be referenced by composite devices.
+   pool, but instead require that the pool is specified when referenced from the 
+   `CompositeDeviceMixin`. This allows the same mixin to be used across different
+   capacity pools. Mixins can not be allocated directly, but can only be referenced
+   by composite devices.
 
 1. Introduce a new device type called `CompositeDevice` which has the same
    fields as a `BasicDevice`, plus two more. The first is a field called
    `Includes` and lists the device mixins for the device, while the second is
    called `SharedCapacityConsumed` and defines the capacity the device will draw
-   from the capacity pools. Only devices are available to be allocated, while the
-   capacity pools just keeps track of the available capacity.
+   from the capacity pools.
 
 1. The `Includes` field serves to reference a set of `CompositeDeviceMixin`s that a
    `CompositeDevice` can reference to extend the set of attributes,
@@ -321,8 +321,7 @@ With these additions in place, the scheduler has everything it needs to support
 the dynamic allocation of both full devices and their (possibly overlapping)
 fixed-size partitions. That is to say, the scheduler now has the ability to
 "flatten" all devices and capacity pools by applying any referenced mixins as
-well as track any capacities consumed from one device by another through its
-capacity pools and the allocation of devices refrencing them. More details
+well as track the capacities consumed by allocated devices. More details
 on the actual algorithm the scheduler follows to make allocation decisions
 based on the capacity pools can be found in the Design Details section below.
 
@@ -342,13 +341,24 @@ type ResourceSliceSpec struct {
   // of devices since they can reference the mixins provided here rather
   // than duplicate them.
   //
-  // The total number of mixins, basic devices, and composite devices must be
-  // less than 128.
+  // The total number of device mixins, capacity pool mixins, basic devices,
+  // and composite devices must be less than 128.
   //
   // +optional
   // +listType=atomic
   DeviceMixins []DeviceMixin
 
+  // CapacityPoolMixins represents a list of capacity pool mixins, i.e.
+  // a collection of capacities that a CapacityPool can "include"
+  // to extend the set of capacities it already defines.
+  //
+  // The main purposes of these mixins is to reduce the memory footprint
+  // of capacity pools since they can reference the mixins provided here rather
+  // than duplicate them.
+  //
+  // The total number of device mixins, capacity pool mixins, basic devices,
+  // and composite devices must be less than 128.
+  //
   // +optional
   // +listType=atomic
   CapacityPoolMixins []CapacityPoolMixin
@@ -358,7 +368,7 @@ type ResourceSliceSpec struct {
   //
   // The names of the pools must be unique in the ResourceSlice.
   //
-  // The maximum number of pools are 32.
+  // The maximum number of pools is 32.
   //
   // +optional
   // listType=atomic
@@ -368,8 +378,8 @@ type ResourceSliceSpec struct {
 // DeviceMixin defines a specific device mixin for each device type.
 // Besides the name, exactly one field must be set.
 type DeviceMixin struct {
-  // Name is a unique identifier among all mixins managed by the driver
-  // in the pool. It must be a DNS label.
+  // Name is a unique identifier among all device mixins in the ResourceSlice.
+  // It must be a DNS label.
   //
   // +required
   Name string
@@ -522,10 +532,26 @@ type CompositeDevice struct {
   SharedCapacityConsumed []CapacityConsumedRef
 }
 
+// CapacityPoolMixin defines a mixin that a capacity pool can include.
 type CapacityPoolMixin struct {
+  // Name is a unique identifier among all capacity pool mixins in the ResourceSlice.
+  // It must be a DNS label.
+  //
   // +required
   Name string
 
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of capacities is 32.
+  //
   // +required
   Capacity map[QualifiedName]DeviceCapacity
 }
@@ -540,39 +566,42 @@ type CapacityPoolMixin struct {
 // by other devices.
 type CapacityPool struct {
   // Name defines the name of the capacity pool.
+  // It must be a DNS label.
   //
   // +required
   Name string
 
+  // Includes defines the set of capacity pool mixins that this capacity
+  // pool includes.
+  //
+  // The propertes of each included mixin are applied to this capacity pool in
+  // order. Conflicting properties from multiple mixins are taken from the
+  // last mixin listed that contains them. Properties set on the capacity pool will
+  // always override properties from mixins.
+  //
+  // The mixins referenced here must be defined in the same
+  // ResourceSlice.
+  //
+  // The maximum number of mixins that can be included is 8.
+  //
   // +optional
   // +listType=atomic
   Includes []CapacityPoolMixinRef
 
-  // Capacity defines the capacities available in the
-  // pool.
+  // Capacity defines the set of capacities for this capacity pool
+  // The name of each capacity must be unique in that set.
   //
-  // Each capacity must have a unique name.
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Capacities listed here will always take precedence over any included
+  // from a mixin.
+  //
+  // The maximum number of capacities is 32.
   //
   // +required
   Capacity map[QualifiedName]DeviceCapacity
-}
-
-// CapacityPoolCapacity defines a shared capacity that is
-// available for use by devies in this ResourceSlice.
-type CapacityPoolCapacity struct {
-  // Name is the name of a capacity.
-  //
-  // The name must be unique for all shared capacities in
-  // a ResourceSlice.
-  //
-  // +required
-  Name string
-
-  // Capacity defines the capacity that is available to
-  // be used by devices.
-  //
-  // +required
-  Capacity resource.Quantity
 }
 
 // DeviceMixinRef defines a reference to a device mixin. It
@@ -596,7 +625,11 @@ type DeviceMixinRef struct {
   CapacityPool string
 }
 
+// CapacityPoolMixinRef defines a reference from a capacity pool
+// to a capacity pool mixin.
 type CapacityPoolMixinRef struct {
+  // Name is the name of a CapacityPoolMixin.
+  //
   // +required
   Name string
 }
@@ -652,15 +685,15 @@ type CapacityConsumedRef struct {
 ```
 
 As mentioned previously, the main features being added here are (1) the ability
-to include a set of mixins in a device definition, and (2) the ability to
-express that capacity from one device gets consumed by another device if/when
-the scheduler decides to allocate it.
+to include a set of mixins in a device or capacity pool definition, and (2) the
+ability to express that multiple devices draw from the same pool of capacity, so
+allocation of one device might make other device unallocatable.
 
 To simplify the conversation, we discuss each new feature separately, starting
-with "mixins" and the new `Includes` field, which allows a set of mixins to
-extend a device with common attributes and capacities.
+with "mixins" for both capacity pools and devices, which allows a set of mixins to
+extend the properties defined explicitly.
 
-### Extending a device with as set of mixins
+### Extending device and capacity pool with a set of mixins
 
 A simple example the defines a set of mixins and includes them in the
 definition of 4 NVIDIA A100 GPUs can be seen below:
@@ -781,13 +814,13 @@ that when the "common-gpu-capacities" mixin are referenced in each device,
 the name of the capacity pool is also provided.
 
 With this in place, the scheduler can parse these device definitions and
-"flatten" them into something that looks exactly the same as a `Basic` device.
-The scheduler can then allocate such devices using the same algorithm it uses
-for `Basic` devices.
+"flatten" them into a set devices that pull capacity from a set of pools. The
+scheduler can use this information to allocate partitionable devices without
+overcommitting the capacity of the physical devices.
 
 ### Defining device partitions in terms of consumed capacity in a composite device
 
-A simple example demonstrating how the `ConsumesCapacityFrom` field can be used
+A simple example demonstrating how capacity pools can be used
 to define multiple, allocatable partitions of a single overarching device can be
 seen below.
 
@@ -843,57 +876,21 @@ available capacity of the device (available to users) and the consumed capacity
 (how much it draws from the capacity pool). This allows the definition of each
 partition to be quite compact.
 
-In general, the way to interpret each of these device definitions is as
-follows:
+After all mixins have been "flattened", the scheduler end up with a list
+of devices that reference a set of pools. It must track the available capacity
+in all capacity pools as devices gets allocated and deallocated, making sure that
+the committed capacity never exceeds what is available.
 
-  * A device which *does not* have a `ConsumesCapacityFrom` field is assumed to
-    be a "source" of capacity from which other devices can pull when they are
-    being allocated.
+Allocated resources are tracked in the ResourceClaims and that is where the
+scheduler currently gets information about which devices are available. Using
+this information, the scheduler can compute the available capacity for each
+resource pool. Since each device specifically defines the capacity it needs,
+there is no ambiguity about what capacity is being used by an allocated device.
 
-  * A device which *does* have a `ConsumesCapacityField` is assumed to be a
-    "sink" of capacity, pulling from "source" devices in order to satisfy its
-    own capacity when allocated.
-
-The scheduler must track the availability of the "source" device, and
-pull from it whenever it decides to allocate a "sink" device.
-
-So long as no other devices have been allocated that reference a given "source"
-device in their `ConsumesCapacityField`, it is free to be allocated by the
-scheduler. However, as soon as its capacity has been pulled down by any given
-"sink" device, it can no longer be allocated until its capacity is freed again.
-
-Likewise, a "sink" device can be allocated if it's "source" device is available.
-
-The devices can be nested, meaning that the same device might be a sink for
-one device and a source for another device. No cycles is allowed, so the
-final device in a chain formed by the `ConsumesCapacityFrom` fields must
-always be a "source" device.
-
-Since the number of entries in the `ConsumesCapacityFrom` list will currently
-be constrained to one, it means a single "sink" device can only pull capacity
-from a single "source" device. In practice this means that the hiararchy of
-"sink" devices under a single "source" device must always form a tree.
-
-During the allocation process, it will no longer be sufficient for the scheduler
-to just check if a device itself is allocated. For a device to be allocatable, the
-following has to be true:
-* All "source" devices from the current device to the root of the tree by following
-  the entries in the `ConsumesCapacityFrom` field, must be allocatable.
-* All "sink" devices in the subtree underneath the current devices must be
-  allocatable.
-
-In other words, the scheduler needs to make sure that no resources that are a
-partition of the current one is already allocated, and that any resources of
-which the current device is a partition has been allocated.
-
-This is pretty straightforward to implement, simply by traversing the subtree
-under the current device and then walking the `ConsumesCapacityFrom` references
-up to the final "source" device.
-
-Since the `ConsumesCapacityFrom` field is a list, we can allow more than one
-"source" device in the future. However, that is more complicated both to
-implement and for users to understand. Whether it will happen depends on
-whether there are compelling use-cases and the priority of supporting those.
+When the scheduler tries to allocate devices for a new ResourceClaim, it will
+go through the list of devices and check which of them are available. Since it
+knows the free capacity in all capacity pools, it can easily check whether a
+specific device can be allocated.
 
 ### Putting it all together for the MIG use-case
 
@@ -909,126 +906,116 @@ together in a discrete set of ways to construct a MIG device with a particular
 "profile". These resources include things like "memory", "number of JPEG
 engines", "discrete memory slices on the physical GPU die", etc.
 
-Using the idea of "sink" and "source" devices, we can construct a full GPU as a
-"source" device with a set of capacities representing the different resources
-in its "bag" of resources. Each MIG device then becomes a "sink" device listing
-out the capacities it requires to build out its specific "profile" and then
-referencing the full GPU it is attached to in its `ConsumesCapacityFrom` field.
+Using the capacity pool to represent the "bag" of capacities, we can define
+a set of devices that pull specific capacity from that pool.
 
-For example, an unrolled "source" device for an NVIDIA A100 GPU looks as follows:
+For example, capacity pool for an NVIDIA A100 GPU looks as follows:
 ```yaml
-- name: gpu-0
-  composite:
-    attributes:
-      ...
-    capacity:
-      copy-engines:
-        quantity: "7"
-      decoders:
-        quantity: "5"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "1"
-      memory:
-        quantity: 40Gi
-      memorySlice0:
-        quantity: "1"
-      memorySlice1:
-        quantity: "1"
-      memorySlice2:
-        quantity: "1"
-      memorySlice3:
-        quantity: "1"
-      memorySlice4:
-        quantity: "1"
-      memorySlice5:
-        quantity: "1"
-      memorySlice6:
-        quantity: "1"
-      memorySlice7:
-        quantity: "1"
-      multiprocessors:
-        quantity: "98"
-      ofa-engines:
-        quantity: "1"
+sharedCapacityPools:
+- name: gpu-0-pool
+  capacities:
+    copy-engines: "7"
+    decoders: "5"
+    encoders: "0"
+    jpeg-engines: "1"
+    memory: 40Gi
+    memorySlice0: "1"
+    memorySlice1: "1"
+    memorySlice2: "1"
+    memorySlice3: "1"
+    memorySlice4: "1"
+    memorySlice5: "1"
+    memorySlice6: "1"
+    memorySlice7: "1"
+    multiprocessors: "98"
+    ofa-engines: "1"
 ```
 
-With three example "sink" devices representing MIG partitions defined as follows:
+Three example devices representing MIG partitions can be defined as follows:
 ```yaml
+sharedCapacityPools:
+- name: gpu-0-pool
+  ...
+deviceMixins:
+- name: mig-1g.5gb
+  capacity:
+    copy-engines: "1"
+    decoders: "0"
+    encoders: "0"
+    jpeg-engines: "0"
+    memory: 4864Mi
+    memorySlice0: "1"
+    multiprocessors: "14"
+    ofa-engines: "0"
+  sharedCapacityConsumed:
+  - name: copy-engines
+    capacity: "1"
+  - name: decoders
+    capacity: "0"
+  - name: encoders
+    capacity: "0"
+  - name: jpeg-engines
+    capacity: "0"
+  - name: memory
+    capacity: 4864Mi
+  - name: memorySlice0
+    capacity: "1"
+  - name: multiprocessors
+    capacity: "14"
+  - name: ofa-engines
+    capacity: "0"
+- name: mig-2g.10gb
+  capacity:
+    copy-engines: "2"
+    decoders: "1"
+    encoders: "0"
+    jpeg-engines: "0"
+    memory: 9856Mi
+    memorySlice0: "1"
+    memorySlice1: "1"
+    multiprocessors: "28"
+    ofa-engines: "0"
+  sharedCapacityConsumed:
+  - name: copy-engines
+    capacity: "2"
+  - name: decoders
+    capacity: "1"
+  - name: encoders
+    capacity: "0"
+  - name: jpeg-engines
+    capacity: "0"
+  - name: memory
+    capacity: 9856Mi
+  - name: memorySlice0
+    capacity: "1"
+  - name: memorySlice1
+    capacity: "1"
+  - name: multiprocessors
+    capacity: "28"
+  - name: ofa-engines
+    capacity: "0"
+devices:
 - name: gpu-0-mig-1g.5gb-0
   composite:
     attributes:
       ...
-    capacity:
-      copy-engines:
-        quantity: "1"
-      decoders:
-        quantity: "0"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "0"
-      memory:
-        quantity: 4864Mi
-      memorySlice0:
-        quantity: "1"
-      multiprocessors:
-        quantity: "14"
-      ofa-engines:
-        quantity: "0"
-    consumesCapacityFrom:
-    - name: gpu-0
-
+    includes:
+    - name: mig-1g.5gb
+      capacityPool: gpu-0-pool
 - name: gpu-0-mig-1g.5gb-1
   composite:
     attributes:
       ...
-    capacity:
-      copy-engines:
-        quantity: "1"
-      decoders:
-        quantity: "0"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "0"
-      memory:
-        quantity: 4864Mi
-      memorySlice1:
-        quantity: "1"
-      multiprocessors:
-        quantity: "14"
-      ofa-engines:
-        quantity: "0"
-    consumesCapacityFrom:
-    - name: gpu-0
-
+    includes:
+    - name: mig-1g.5gb
+      capacityPool: gpu-0-pool
 - name: gpu-0-mig-2g.10gb-0-1
   composite:
     attributes:
       ...
-    capacity:
-      copy-engines:
-        quantity: "2"
-      decoders:
-        quantity: "1"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "0"
-      memory:
-        quantity: 9856Mi
-      memorySlice0:
-        quantity: "1"
-      memorySlice1:
-        quantity: "1"
-      multiprocessors:
-        quantity: "28"
-      ofa-engines:
-        quantity: "0"
-    consumesCapacityFrom:
-    - name: gpu-0
+    includes:
+    - name: mig-2g.10gb
+      capacityPool: gpu-0-pool
 ```
 
 The first two MIG devices can be allocated together because there is enough
@@ -1038,15 +1025,19 @@ allocated together with the third one because they compete on the capacity
 available in the full GPU across its "memorySlice0" and "memorySlice1"
 dimensions respectively.
 
+Note that the use of the two device mixins that reprents the two MIG profiles
+allows us to define the "shape" of the devices once and use them to define
+the actual devices in just a few lines of yaml.
+Also, since the device mixin representing the profiles doesn't have a
+direct reference to a specific capacity pool, they can be re-used if we wanted
+to represent a second NVIDIA A100.
+
 A comprehensive example of the actual MIG partitions that would be created for
 a 2 GPU DGXA100 server that ties together the concepts of both mixins and
 `ConsumesCapacityFrom` can be seen below.
 
-One can imagine how this would be extended for larger servers with more GPUs,
-by simply adding new devices with references to the proper mixins and filling
-out their `ConsumesCapacityFrom` fields appropriately.
-
 ```yaml
+******* WILL BE UPDATED ONCE WE MORE FEEDBACK ON THE DESIGN *******
 deviceMixins:
 - name: common-gpu-nvidia-a100-sxm4-40gb-attributes
   composite:
@@ -2276,13 +2267,10 @@ It adds complexity to the scheduler.
 
 ## Alternatives
 
-Many different approaches were considered, but all of them were either *too*
-flexible (e.g. adding a DSL within the embedded YAML to construct a set of
-devices) or too rigid (e.g. would not be easily extendible to support
-multiple-levels of partitioning). The proposal we ultimately landed on is a
-nice balance between the two.
+Many different approaches were considered. Some of them have similarities with
+the chosen approach while others are pretty different.
 
-Specifically, the following seven alternative proposals were considered:
+Specifically, the following eight alternative proposals were considered:
 
 **Option 1:** Top-level, single "bag" of resources with no mixins
 
@@ -2381,6 +2369,21 @@ ruled-out as a future enhancement since without them there is ALOT of redudant
 information repeated in each ResourceSlice. However, it is out of scope of the
 current KEP and may be considered in a later one.
 
-See the following for more details on each of the alternate approaches
+**Option 8:**
+
+This approach doesn't treat the capacities of the physical device as separate
+from the devices published through the API (i.e. as a "bag" of resources).
+Instead a hierarchy of devices are defined, with references between then defining
+which devices consumes capacities shared with other devices. By walking the directed
+graph formed by the references and tracking available capacity for all devices, the
+scheduler can determine which devices are allocatable. This design didn't separate
+the capacities a device consumes from the capacities it advertises, which makes
+tracking available devices difficult and also makes it difficult to model some
+types of devices. This approach also used mixin system that is similar to the chosen
+design.
+
+
+See the following for more details on the first seven of the alternate approaches
 discussed above:
-https://github.com/kubernetes-sigs/wg-device-management/issues/20
+https://github.com/kubernetes-sigs/wg-device-management/issues/20. The eight option
+is described in more detail in https://github.com/kubernetes/enhancements/pull/4874.
