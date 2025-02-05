@@ -312,16 +312,16 @@ type ResourceSliceSpec struct {
   // +listType=atomic
   DeviceMixins []DeviceMixin
 
-  // SharedCapacity defines a list of advertised capacities. These
-  // are not allocatable by themselves, but is referenced by devices
-  // defined in the ResourceSlice and consumed when the device is
-  // allocated.
+  // SharedCapacityPools defines a list of capacity pools, each of which
+  // has a name and a list of capacities available in the pool.
   //
-  // The maximum number of shared capacities is 128.
+  // The names of the pools must be unique in the ResourceSlice.
+  //
+  // The maximum number of pools are 32.
   //
   // +optional
   // listType=atomic
-  SharedCapacity []SharedCapacityEntry
+  SharedCapacityPools []CapacityPool
 }
 
 // DeviceMixin defines a specific device mixin for each device type.
@@ -388,7 +388,7 @@ type CompositeDeviceMixin struct {
   // The maximum number of consumed capacities is 32.
   //
   // +optional
-  SharedCapacityConsumed []CapacityConsumedRef 
+  SharedCapacityConsumed []MixinCapacityConsumedRef 
 }
 
 // Device represents one individual hardware instance that can be selected based
@@ -463,10 +463,10 @@ type CompositeDevice struct {
   Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
 
   // SharedCapacityConsumed defines a list of references to
-  // shared capacities defined in the same ResourceSlice. Each
-  // of the references points to a named shared capacity and
-  // includes the quantity of that capacity that the devices
-  // needs.
+  // shared capacities defined in shared pools in the same
+  // ResourceSlice. Each of the references points to a named
+  // shared capacity and includes the quantity of that capacity
+  // that the devices needs.
   //
   // During allocation, a device can only be allocated if
   // sufficient shared capacity is available to meet the
@@ -481,17 +481,32 @@ type CompositeDevice struct {
   SharedCapacityConsumed []CapacityConsumedRef
 }
 
-// DeviceMixinRef defines a reference to a device mixin.
+// DeviceMixinRef defines a reference to a device mixin. It
+// also lets users provide a capacity pool which will be used
+// to resolve any entries in the SharedCapacityConsumed list
+// in the mixin to the correct capacity pool.
 type DeviceMixinRef struct {
   // Name refers to the name of a device mixin in the pool.
   //
   // +required
   Name string
+
+  // CapacityPool defines the capacity pool that will be used
+  // when resolving entries in the SharedCapacityConsumed list
+  // in the mixin.
+  //
+  // The value is only needed if the referenced mixin has
+  // at least one entry in the SharedCapacityConsumed list.
+  //
+  // +optional
+  CapacityPool string
 }
 
-// CapacityConsumedRef defines a reference from a device to
-// a shared capacity.
-type CapacityConsumedRef struct {
+// MixinCapacityConsumedRef defines a reference from a mixin
+// to a capacity in an undefined pool. This allows the same
+// mixin to be used across multiple pools since the pool is
+// defined when the mixin is referenced from the device.
+type MixinCapacityConsumedRef struct {
   // Name defines the name of the shared capacity that
   // is being referenced.
   //
@@ -509,9 +524,59 @@ type CapacityConsumedRef struct {
   Capacity resource.Quantity
 }
 
-// SharedCapacityEntry defines a shared capacity that is
+// CapacityConsumedRef defines a reference from a device to
+// a shared capacity in a capacity pool.
+type CapacityConsumedRef struct {
+  // CapacityPool defines the shared pool in which the capacity
+  // referenced exists. It must point to an existing
+  // capacity pool in the same ResourceSlice.
+  //
+  // +required
+  CapacityPool string
+  
+  // Name defines the name of the shared capacity that
+  // is being referenced.
+  //
+  // Name must be unique for the references from a single
+  // device, but multiple devices can reference the same
+  // shared capacity.
+  //
+  // +required
+  Name string
+
+  // Capacity defines the capacity that is required by
+  // the device.
+  //
+  // +required
+  Capacity resource.Quantity
+}
+
+// CapacityPool defines a named pool of capacities
+// that are available to be used by devices defined in the
+// ResourceSlice.
+//
+// The capacities are not allocatable by themselves, but
+// can be referenced by devices. When a device is allocated,
+// the capacity it uses will no longer be available for use
+// by other devices.
+type CapacityPool struct {
+  // Name defines the name of the capacity pool.
+  //
+  // +required
+  Name string
+
+  // Capacities defines the capacities available in the
+  // pool.
+  //
+  // Each capacity must have a unique name.
+  //
+  // +required
+  Capacities []CapacityPoolCapacity
+}
+
+// CapacityPoolCapacity defines a shared capacity that is
 // available for use by devies in this ResourceSlice.
-type SharedCapacityEntry struct {
+type CapacityPoolCapacity struct {
   // Name is the name of a capacity.
   //
   // The name must be unique for all shared capacities in
@@ -543,11 +608,13 @@ A simple example the defines a set of mixins and includes them in the
 definition of 4 NVIDIA A100 GPUs can be seen below:
 
 ```yaml
-sharedCapacity:
-- capacity: 5
-  name: gpu-1-processors
-- capacity: 20Gi
-  name: gpu-1-memory
+sharedCapacityPools:
+- name: gpu-1-pool
+  capacities:
+  - capacity: 5
+    name: processors
+  - capacity: 20Gi
+    name: memory
 deviceMixins:
 - name: system-attributes
   composite:
@@ -572,9 +639,9 @@ deviceMixins:
 - name: common-gpu-capacities
   sharedCapacityConsumed:
   - capacity: 5Gi
-    name: gpu-1-processors
+    name: processors
   - capacity: 1
-    name: gpu-1-memory
+    name: memory
 devices:
 - name: gpu-0
   composite:
@@ -582,6 +649,7 @@ devices:
     - name: system-attributes
     - name: common-gpu-attributes
     - name: common-gpu-capacities
+      capacityPool: gpu-1-pool
     attributes:
       index:
         int: 0
@@ -595,6 +663,7 @@ devices:
     - name: system-attributes
     - name: common-gpu-attributes
     - name: common-gpu-capacities
+      capacityPool: gpu-1-pool
     attributes:
       index:
         int: 1
@@ -608,6 +677,7 @@ devices:
     - name: system-attributes
     - name: common-gpu-attributes
     - name: common-gpu-capacities
+      capacityPool: gpu-1-pool
     attributes:
       index:
         int: 2
@@ -621,6 +691,7 @@ devices:
     - name: system-attributes
     - name: common-gpu-attributes
     - name: common-gpu-capacities
+      capacityPool: gpu-1-pool
     attributes:
       index:
         int: 3
@@ -647,45 +718,52 @@ to define multiple, allocatable partitions of a single overarching device can be
 seen below.
 
 ```yaml
-sharedCapacity:
-- capacity: 40Gi
-  name: gpu-0-memory
+sharedCapacityPools:
+- name: gpu-0-pool
+  capacities:
+  - name: memory
+    capacity: 40Gi
 devices:
 - name: gpu-0
   composite:
     capacity:
       memory: 40Gi
     sharedCapacityConsumed:
-    - capacity: 40Gi
-      name: gpu-0-memory
+    - name: memory
+      capacityPool: gpu-0-pool
+      capacity: 40Gi
 - name: gpu-0-partition-0
   composite:
     capacity:
       memory: 10Gi
     sharedCapacityConsumed:
-    - capacity: 10Gi
-      name: gpu-0-memory
+    - name: memory
+      capacityPool: gpu-0-pool
+      capacity: 10Gi
 - name: gpu-0-partition-1
   composite:
     capacity:
       memory: 10Gi
     sharedCapacityConsumed:
-    - capacity: 10Gi
-      name: gpu-0-memory
+    - name: memory
+      capacityPool: gpu-0-pool
+      capacity: 10Gi
 - name: gpu-0-partition-2
   composite:
     capacity:
       memory: 10Gi
     sharedCapacityConsumed:
-    - capacity: 10Gi
-      name: gpu-0-memory
+    - name: memory
+      capacityPool: gpu-0-pool
+      capacity: 10Gi
 - name: gpu-0-partition-3
   composite:
     capacity:
       memory: 10Gi
     sharedCapacityConsumed:
-    - capacity: 10Gi
-      name: gpu-0-memory
+    - name: memory
+      capacityPool: gpu-0-pool
+      capacity: 10Gi
 ```
 
 In this example, five devices are defined: a full GPU called "gpu-0" and four
