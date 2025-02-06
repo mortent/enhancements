@@ -342,13 +342,15 @@ The basic idea is the following:
    to allocate it. This essentially removes that capacity from any referenced
    devices, rendering them unallocatable on their own.
 
-1. The `NodeName` and `NodeSelector` fields describes the node or set of nodes
-   where the device is available. This is similar to the `NodeName`, `NodeSelector`,
-   and `AllNodes` properties in the `ResourceSlice` spec, but this allows for
-   associating individual devices to node(s). That makes it possible to describe
-   multi-host devices using the ResourceSlice API. The `NodeName` and `NodeSelector`
-   fields are mutually exclusive and neither can be specified if the `Spec.NodeName` or
-   `Spec.NodeSelector` fields are specified on the `ResourceSlice`.
+1. The `NodeSelectionDelegated` field on the `ResourceSlice` spec specifies
+   whether the availability of the resources from nodes is defined on the
+   `ResourceSlice` or on each individual device. If it is specified on the
+   `ResourceSlice`, that choice applies to all devices in the slice.
+   Three fields on the `CompositeDevice` object defines availability of the device
+   from nodes. These fields are `NodeName`, `NodeSelector`, and `AllNodes` are
+   mutually exclusive and mirrors the same fields on the `ResourceSlice` spec.
+   These fields can only be set if `NodeSelectionDelegated` on the `ResourceSlice`
+   spec is set to `true`.
 
 With these additions in place, the scheduler has everything it needs to support
 the dynamic allocation of both full devices, their (possibly overlapping)
@@ -365,187 +367,207 @@ The exact set of proposed API changes can be seen below:
 ```go
 // ResourceSliceSpec contains the information published by the driver in one ResourceSlice.
 type ResourceSliceSpec struct {
-	...
+  ...
 
-	// DeviceMixins represents a list of device mixins, i.e. a collection of
-	// shared attributes and capacities that an actual device can "include"
-	// to extend the set of attributes and capacities it already defines.
-	//
-	// The main purposes of these mixins is to reduce the memory footprint
-	// of devices since they can reference the mixins provided here rather
-	// than duplicate them.
-	//
-	// The total number of mixins, basic devices, and composite devices must be
-	// less than 128.
-	//
-	// +optional
-	// +listType=atomic
-	DeviceMixins []DeviceMixin `json:"deviceMixins,omitempty"`
+  // NodeSelectionDelegated defines whether the access from nodes to
+  // resources in the pool is set on the ResourceSlice level or on each
+  // device. If it is set to true, every device defined the ResourceSlice
+  // must specify this individually.
+  //
+  // Exactly one of NodeName, NodeSelector, AllNodes, and NodeSelectionDelegated
+  // must be set.
+  //
+  // +optional
+  // +oneOf=NodeSelection
+  NodeSelectionDelegated bool
+
+  // DeviceMixins represents a list of device mixins, i.e. a collection of
+  // shared attributes and capacities that an actual device can "include"
+  // to extend the set of attributes and capacities it already defines.
+  //
+  // The main purposes of these mixins is to reduce the memory footprint
+  // of devices since they can reference the mixins provided here rather
+  // than duplicate them.
+  //
+  // The total number of mixins, basic devices, and composite devices must be
+  // less than 128.
+  //
+  // +optional
+  // +listType=atomic
+  DeviceMixins []DeviceMixin `json:"deviceMixins,omitempty"`
 }
 
 // DeviceMixin defines a specific device mixin for each device type.
 // Besides the name, exactly one field must be set.
 type DeviceMixin struct {
-	// Name is a unique identifier among all mixins managed by the driver
-	// in the pool. It must be a DNS label.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name is a unique identifier among all mixins managed by the driver
+  // in the pool. It must be a DNS label.
+  //
+  // +required
+  Name string `json:"name"`
 
-	// Composite defines a mixin usable by a composite device.
-	//
-	// +optional
-	// +oneOf=deviceMixinType
-	Composite *CompositeDeviceMixin `json:"composite,omitempty"`
+  // Composite defines a mixin usable by a composite device.
+  //
+  // +optional
+  // +oneOf=deviceMixinType
+  Composite *CompositeDeviceMixin `json:"composite,omitempty"`
 }
 
 // CompositeDeviceMixin defines a mixin that a composite device can include.
 type CompositeDeviceMixin struct {
-	// Attributes defines the set of attributes for this mixin.
-	// The name of each attribute must be unique in that set.
-	//
-	// To ensure this uniqueness, attributes defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting attributes from those provided via other mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+  // Attributes defines the set of attributes for this mixin.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
 
-	// Capacity defines the set of capacities for this mixin.
-	// The name of each capacity must be unique in that set.
-	//
-	// To ensure this uniqueness, capacities defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting capacities from those provided via other mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
+  // Capacity defines the set of capacities for this mixin.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via other mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
 }
 
 // Device represents one individual hardware instance that can be selected based
 // on its attributes. Besides the name, exactly one field must be set.
 // +k8s:deepcopy-gen=true
 type Device struct {
-	// Name is unique identifier among all devices managed by
-	// the driver in the pool. It must be a DNS label.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name is unique identifier among all devices managed by
+  // the driver in the pool. It must be a DNS label.
+  //
+  // +required
+  Name string `json:"name"`
 
-	// Basic defines one device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Basic *BasicDevice
+  // Basic defines one device instance.
+  //
+  // +optional
+  // +oneOf=deviceType
+  Basic *BasicDevice
 
-	// Composite defines one composite device instance.
-	//
-	// +optional
-	// +oneOf=deviceType
-	Composite *CompositeDevice `json:"composite,omitempty"`
+  // Composite defines one composite device instance.
+  //
+  // +optional
+  // +oneOf=deviceType
+  Composite *CompositeDevice `json:"composite,omitempty"`
 }
 
 // CompositeDevice defines one device instance.
 type CompositeDevice struct {
-	// Includes defines the set of device mixins that this device includes.
-	//
-	// The propertes of each included mixin are applied to this device in
-	// order. Conflicting properties from multiple mixins are taken from the
-	// last mixin listed that contains them.
-	//
-	// The maximum number of mixins that can be included is 8.
-	//
-	// +optional
-	Includes []DeviceMixinRef `json:"includes,omitempty"`
+  // Includes defines the set of device mixins that this device includes.
+  //
+  // The propertes of each included mixin are applied to this device in
+  // order. Conflicting properties from multiple mixins are taken from the
+  // last mixin listed that contains them.
+  //
+  // The maximum number of mixins that can be included is 8.
+  //
+  // +optional
+  Includes []DeviceMixinRef `json:"includes,omitempty"`
 
-	// ConsumesCapacityFrom defines the set of devices where any capacity
-	// consumed by this device should be pulled from. This applies recursively.
-	// In cases where the device names itself as its source, the recursion is
-	// halted.
-	//
-	// Conflicting capacities from multiple devices are taken from the
-	// last device listed that contains them.
-	//
-	// The maximum number of devices that can be referenced is 8.
-	//
-	// +optional
-	ConsumesCapacityFrom []DeviceRef `json:"consumesCapacityFrom,omitempty"`
+  // ConsumesCapacityFrom defines the set of devices where any capacity
+  // consumed by this device should be pulled from. This applies recursively.
+  // In cases where the device names itself as its source, the recursion is
+  // halted.
+  //
+  // Conflicting capacities from multiple devices are taken from the
+  // last device listed that contains them.
+  //
+  // The maximum number of devices that can be referenced is 8.
+  //
+  // +optional
+  ConsumesCapacityFrom []DeviceRef `json:"consumesCapacityFrom,omitempty"`
 
-	// NodeName identifies the node where the device is available.
-	//
-	// Must only be set if Spec.AllNodes is set.
-	// Only one or none of NodeName and NodeSelector must be set.
-	//
-	// +optional
-	// +oneOf=DeviceNodeSelection
-	NodeName string
+  // NodeName identifies the node where the device is available.
+  //
+  // Must only be set if Spec.AllNodes is set.
+  // Only one or none of NodeName and NodeSelector must be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  NodeName string
 
-	// NodeSelector defines the nodes where the device is available.
-	//
-	// Must use exactly one term.
-	//
-	// Must only be set if Spec.AllNodes is set.
-	// Only one or none of NodeName and NodeSelector must be set.
-	//
-	// +optional
-	// +oneOf=DeviceNodeSelection
-	NodeSelector *core.NodeSelector
+  // NodeSelector defines the nodes where the device is available.
+  //
+  // Must use exactly one term.
+  //
+  // Must only be set if Spec.AllNodes is set.
+  // Only one or none of NodeName and NodeSelector must be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  NodeSelector *core.NodeSelector
 
-	// Attributes defines the set of attributes for this device.
-	// The name of each attribute must be unique in that set.
-	//
-	// To ensure this uniqueness, attributes defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting attributes from those provided via mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+  // AllNodes indicates that all nodes have access to the device.
+  //
+  // Exactly one of NodeName, NodeSelector and AllNodes must be set.
+  //
+  // +optional
+  // +oneOf=DeviceNodeSelection
+  AllNodes bool
 
-	// Capacity defines the set of capacities for this device.
-	// The name of each capacity must be unique in that set.
-	//
-	// To ensure this uniqueness, capacities defined by the vendor
-	// must be listed without the driver name as domain prefix in
-	// their name. All others must be listed with their domain prefix.
-	//
-	// Conflicting capacities from those provided via mixins are
-	// overwritten by the ones provided here.
-	//
-	// The maximum number of attributes and capacities combined is 32.
-	//
-	// +optional
-	Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
+  // Attributes defines the set of attributes for this device.
+  // The name of each attribute must be unique in that set.
+  //
+  // To ensure this uniqueness, attributes defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting attributes from those provided via mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Attributes map[QualifiedName]DeviceAttribute `json:"attributes,omitempty"`
+
+  // Capacity defines the set of capacities for this device.
+  // The name of each capacity must be unique in that set.
+  //
+  // To ensure this uniqueness, capacities defined by the vendor
+  // must be listed without the driver name as domain prefix in
+  // their name. All others must be listed with their domain prefix.
+  //
+  // Conflicting capacities from those provided via mixins are
+  // overwritten by the ones provided here.
+  //
+  // The maximum number of attributes and capacities combined is 32.
+  //
+  // +optional
+  Capacity map[QualifiedName]DeviceCapacity `json:"capacity,omitempty"`
 }
 
 // DeviceMixinRef defines a reference to a device mixin.
 type DeviceMixinRef struct {
-	// Name refers to the name of a device mixin in the pool.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name refers to the name of a device mixin in the pool.
+  //
+  // +required
+  Name string `json:"name"`
 }
 
 // DeviceRef defines a reference to a device.
 type DeviceRef struct {
-	// Name refers to the name of a device in the pool.
-	//
-	// +required
-	Name string `json:"name"`
+  // Name refers to the name of a device in the pool.
+  //
+  // +required
+  Name string `json:"name"`
 }
 ```
 
@@ -758,7 +780,7 @@ kind: ResourceSlice
 apiVersion: resource.k8s.io/v1beta1
 ...
 spec:
-  allNodes: true
+  nodeSelectionDelegated: true
   pool:
     ...
   driver: tpu.dra.example.com
