@@ -701,7 +701,7 @@ definition of 4 NVIDIA A100 GPUs can be seen below:
 ```yaml
 capacityPoolMixins:
 - name: gpu-pool-mixin
-  capacities:
+  capacity:
     memory: 40Gi
 sharedCapacityPools:
 - name: gpu-0-pool
@@ -827,7 +827,7 @@ seen below.
 ```yaml
 sharedCapacityPools:
 - name: gpu-0-pool
-  capacities:
+  capacity:
     memory: 40Gi
 deviceMixins:
 - name: gpu-partition
@@ -913,7 +913,7 @@ For example, capacity pool for an NVIDIA A100 GPU looks as follows:
 ```yaml
 sharedCapacityPools:
 - name: gpu-0-pool
-  capacities:
+  capacity:
     copy-engines: "7"
     decoders: "5"
     encoders: "0"

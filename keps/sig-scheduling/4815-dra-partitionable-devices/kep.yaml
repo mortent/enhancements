@@ -3,9 +3,9 @@ kep-number: 4815
 authors:
   - "@klueska"
   - "@mortent"
-owning-sig: sig-node
+owning-sig: sig-scheduling
 participating-sigs:
-  - sig-scheduling
+  - sig-node
   - sig-autoscaling
 status: implementable
 creation-date: 2024-09-25
