@@ -261,7 +261,7 @@ On a high level, this proposal is based around two new concepts:
    partition will specify how much capacity it will consume from the capacity
    pool, which allows the scheduler to keep track of available capacity in
    a pool and decide whether a partition can be allocated. A device will
-   separatly set the capacities that is published for the partition.
+   separately define the capacities that are accessible to the user for the partition.
 
 1. Mixins, which allows devices and resource pools to reference a mixin
    object that defines some properties and that when used, will extend the properties
@@ -287,8 +287,8 @@ ResourceSlice API:
 1. The `CapacityPoolMixins` field defines a list of named `CapacityPoolMixin`s. These
    define a set of capacities that can be used to extend the capacities explicitly
    defined in a `CapacityPool`. This allows for reduced duplication if there are many
-   identical physical devices that must be represented as capacity pools. Mixins
-   can not be refrenced directly by devices.
+   identical physical devices that must be represented as capacity pools. CapacityPoolMixins
+   can not be referenced directly by devices.
 
 1. The `DeviceMixins` field is a list of named `CompositeDeviceMixin`s. These define
    attributes, capacities and consumed capacities that can be used to extend
@@ -307,7 +307,7 @@ ResourceSlice API:
 
 1. The `Includes` field serves to reference a set of `CompositeDeviceMixin`s that a
    `CompositeDevice` can reference to extend the set of attributes,
-   capacities and consumed capacity it definces explicitly. If the referenced
+   capacities and consumed capacity it defines explicitly. If the referenced
    `CompositeDeviceMixin` specifies consumed capacity through the
    `SharedCapacityConsumed` list, the reference must also include the name
    of the capacity pool from which the capacity will be drawn.
@@ -687,7 +687,7 @@ type CapacityConsumedRef struct {
 As mentioned previously, the main features being added here are (1) the ability
 to include a set of mixins in a device or capacity pool definition, and (2) the
 ability to express that multiple devices draw from the same pool of capacity, so
-allocation of one device might make other device unallocatable.
+allocation of one device might make other devices unallocatable.
 
 To simplify the conversation, we discuss each new feature separately, starting
 with "mixins" for both capacity pools and devices, which allows a set of mixins to
@@ -815,7 +815,7 @@ the name of the capacity pool is also provided.
 
 With this in place, the scheduler can parse these device definitions and
 "flatten" them into a set devices that pull capacity from a set of pools. The
-scheduler can use this information to allocate partitionable devices without
+scheduler can use this information to allocate device partitions without
 overcommitting the capacity of the physical devices.
 
 ### Defining device partitions in terms of consumed capacity in a composite device
@@ -892,6 +892,12 @@ go through the list of devices and check which of them are available. Since it
 knows the free capacity in all capacity pools, it can easily check whether a
 specific device can be allocated.
 
+Note that since the scheduler will go through these in order and select the first
+(not best) fit, it is recommended that ResourceSlices include devices in
+smallest-to-largest order. Otherwise, the largest one will always be allocated.
+This may be improved through scoring mechanisms, but that is outside of the scope
+of this KEP. It is being tracked in https://github.com/kubernetes/enhancements/issues/4970.
+
 ### Putting it all together for the MIG use-case
 
 The example in the previous section only lists a **single** "memory" capacity
@@ -909,7 +915,7 @@ engines", "discrete memory slices on the physical GPU die", etc.
 Using the capacity pool to represent the "bag" of capacities, we can define
 a set of devices that pull specific capacity from that pool.
 
-For example, capacity pool for an NVIDIA A100 GPU looks as follows:
+For example, a capacity pool for an NVIDIA A100 GPU looks as follows:
 ```yaml
 sharedCapacityPools:
 - name: gpu-0-pool
