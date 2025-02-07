@@ -268,16 +268,15 @@ On a high level, this proposal is based around two new concepts:
    they define explicitly on the device or resource pool. The objective is to reduce
    the duplication and overall footprint of `ResourceSlices`.
 
-
 The implementation of these concepts requires several changes to the
 ResourceSlice API:
 
-1. It introduces three new fields on the `ResourceSliceSpec`. First, `CapacityPools`
+1. It introduces four new fields on the `ResourceSliceSpec`. First, `CapacityPools`
    defines a list of `CapacityPools`, each of which defines a set of capacities
    that devices can draw from. `CapacityPoolMixins`, `DeviceMixins`, and
-   `DeviceCapacityConsumptionMixins` defines mixins for capacity pools and devices.
+   `DeviceCapacityConsumptionMixins` define mixins for capacity pools and devices.
 
-1. The `SharedCapacityPools` field is a list of named `CapacityPool`s. Each
+1. The `CapacityPools` field is a list of named `CapacityPool`s. Each
    defines a set of capacities that is available for devices. This makes it possible
    to define overlapping partitions of devices, while still making sure that no
    device can be allocated if the necessary capacity is not available. A `CapacityPool`
@@ -446,7 +445,7 @@ type DeviceCapacityConsumptionMixin struct {
   // +required
   Name string
 
-  // CapacityConsumption defines a set of capacities
+  // Capacity defines a set of capacities
   // that a device will consume from a capacity pool.
   //
   // The capacity pool is not specified here but is determined
@@ -456,7 +455,7 @@ type DeviceCapacityConsumptionMixin struct {
   // The maximum number of capacities is 32
   //
   // +required
-  CapacityConsumption map[QualifiedName]DeviceCapacity
+  Capacity map[QualifiedName]DeviceCapacity
 }
 
 // Device represents one individual hardware instance that can be selected based
@@ -539,13 +538,13 @@ type CompositeDevice struct {
   // the capacities directly. The latter will always override
   // any capacities coming in from the mixins.
   //
-  // The maximum number of references is 32. This is the
-  // same as the maximum number of capacity pools allowed in
-  // a ResourceSlice.
+  // The maximum number of device capacity consumption entries
+  // is 32. This is the same as the maximum number of capacity
+  // pools allowed in a ResourceSlice.
   //
   // +required
   // +listType=atomic
-  ConsumesCapacity []CapacityConsumptionRef
+  ConsumesCapacity []DeviceCapacityConsumption
 }
 
 // CapacityPoolMixin defines a mixin that a capacity pool can include.
@@ -644,9 +643,9 @@ type DeviceCapacityConsumptionMixinRef struct {
   Name string
 }
 
-// DeviceCapacityConsumptionRef defines a set of capacities that
+// DeviceCapacityConsumption defines a set of capacities that
 // a device will consume from a capacity pool.
-type DeviceCapacityConsumptionRef struct {
+type DeviceCapacityConsumption struct {
   // CapacityPool defines the capacity pool from which the
   // capacities defined (either directly or through a mixin)
   // will be consumed from.
@@ -654,24 +653,28 @@ type DeviceCapacityConsumptionRef struct {
   // +required
   CapacityPool string
   
-  // Mixins defines a list of references to DeviceCapacityConsumptionMixins.
+  // Includes defines a list of references to DeviceCapacityConsumptionMixins.
   // The capacities listed in these will be included in among the
   // capacities that will be consumed by the device.
   //
   // Capacities listed directly will override any capacities coming
   // from mixins.
   //
+  // The maximum number of mixins that can be included is 8.
+  //
   // +optional
-  Mixins []DeviceCapacityConsumptionMixinRef
+  Includes []DeviceCapacityConsumptionMixinRef
 
-  // CapacityConsumption defines the capacity that will be consumed by
+  // Capacity defines the capacity that will be consumed by
   // the device.
   //
-  // Capacity listed here will override any capacities that
+  // Capacities listed here will override any capacities that
   // are also defined in any of the referenced mixins.
   //
+  // The maximum number of capacities is 32.
+  //
   // +optional
-  CapacityConsumption DeviceCapacity
+  Capacity map[QualifiedName]DeviceCapacity
 }
 ```
 
@@ -693,7 +696,8 @@ definition of 4 NVIDIA A100 GPUs can be seen below:
 capacityPoolMixins:
 - name: gpu-pool-mixin
   capacity:
-    memory: 40Gi
+    memory: 
+      value: 40Gi
 capacityPools:
 - name: gpu-0-pool
   includes:
@@ -730,11 +734,13 @@ deviceMixins:
         version: 8.0.0
 - name: common-gpu-capacities
   capacity:
-    memory: 40Gi
+    memory: 
+      value: 40Gi
 deviceCapacityConsumptionMixins:
 - name: common-gpu-consumption
-  capacityConsumption:
-    memory: 40Gi
+  capacity:
+    memory: 
+      value: 40Gi
 devices:
 - name: gpu-0
   composite:
@@ -751,7 +757,7 @@ devices:
         string: GPU-4cf8db2d-06c0-7d70-1a51-e59b25b2c16c
     consumesCapacity:
     - capacityPool: gpu-0-pool
-      mixins:
+      includes:
       - name: common-gpu-consumption
 - name: gpu-1
   composite:
@@ -768,7 +774,7 @@ devices:
         string: GPU-4404041a-04cf-1ccf-9e70-f139a9b1e23c
     consumesCapacity:
     - capacityPool: gpu-1-pool
-      mixins:
+      includes:
       - name: common-gpu-consumption
 - name: gpu-2
   composite:
@@ -785,7 +791,7 @@ devices:
         string: GPU-79a2ba02-a537-ccbf-2965-8e9d90c0bd54
     consumesCapacity:
     - capacityPool: gpu-2-pool
-      mixins:
+      includes:
       - name: common-gpu-consumption
 - name: gpu-3
   composite:
@@ -802,7 +808,7 @@ devices:
         string: GPU-662077db-fa3f-0d8f-9502-21ab0ef058a2
     consumesCapacity:
     - capacityPool: gpu-3-pool
-      mixins:
+      includes:
       - name: common-gpu-consumption
 ```
 
@@ -833,31 +839,36 @@ seen below.
 capacityPools:
 - name: gpu-0-pool
   capacity:
-    memory: 40Gi
+    memory: 
+      value: 40Gi
 deviceMixins:
 - name: gpu-partition-capacity
   capacity:
-    memory: 10Gi
+    memory: 
+      value: 10Gi
 deviceCapacityConsuptionMixins:
 - name: gpu-partition-consumption
-  capacityConsumption:
-    memory: 10Gi
+  capacity:
+    memory: 
+      value: 10Gi
 devices:
 - name: gpu-0
   composite:
     capacity:
-      memory: 40Gi
+      memory: 
+        value: 40Gi
     consumesCapacity:
     - capacityPool: gpu-0-pool
-      capacityConsumption:
-        memory: 40Gi
+      capacity:
+        memory: 
+          value: 40Gi
 - name: gpu-0-partition-0
   composite:
     includes:
     - name: gpu-partition-capacity
     consumesCapacity:
     - capacityPool: gpu-pool-mixin
-    - mixins:
+    - includes:
       - name: gpu-partition-consumption
 - name: gpu-0-partition-1
   composite:
@@ -865,7 +876,7 @@ devices:
     - name: gpu-partition-capacity
     consumesCapacity:
     - capacityPool: gpu-pool-mixin
-    - mixins:
+    - includes:
       - name: gpu-partition-consumption
 - name: gpu-0-partition-2
   composite:
@@ -873,7 +884,7 @@ devices:
     - name: gpu-partition-capacity
     consumesCapacity:
     - capacityPool: gpu-pool-mixin
-    - mixins:
+    - includes:
       - name: gpu-partition-consumption
 - name: gpu-0-partition-3
   composite:
@@ -881,7 +892,7 @@ devices:
     - name: gpu-partition-capacity
     consumesCapacity:
     - capacityPool: gpu-pool-mixin
-    - mixins:
+    - includes:
       - name: gpu-partition-consumption
 ```
 
@@ -935,7 +946,7 @@ a set of devices that pull specific capacity from that pool.
 
 For example, a capacity pool for an NVIDIA A100 GPU looks as follows:
 ```yaml
-sharedCapacityPools:
+capacityPools:
 - name: gpu-0-pool
   capacity:
     copy-engines: "7"
