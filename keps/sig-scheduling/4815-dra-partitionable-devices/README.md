@@ -269,12 +269,9 @@ On a high level, this proposal is based around two new concepts:
    the duplication and overall footprint of `ResourceSlices`.
 
 The implementation of these concepts requires several changes to the
-ResourceSlice API:
-
-1. It introduces four new fields on the `ResourceSliceSpec`. First, `CapacityPools`
-   defines a list of `CapacityPools`, each of which defines a set of capacities
-   that devices can draw from. `CapacityPoolMixins`, `DeviceMixins`, and
-   `DeviceCapacityConsumptionMixins` define mixins for capacity pools and devices.
+ResourceSlice API. It introduces two new fields on the `ResourceSliceSpec`.
+`CapacityPools` defines a list of `CapacityPools` while `Mixins` define the
+mixins.
 
 1. The `CapacityPools` field is a list of named `CapacityPool`s. Each
    defines a set of capacities that is available for devices. This makes it possible
@@ -283,16 +280,27 @@ ResourceSlice API:
    can optionally reference one or more `CapacityPoolMixin`s using the `Includes` field
    to extend the set of capacities it defines explicitly.
 
-1. The `CapacityPoolMixins` field defines a list of named `CapacityPoolMixin`s. These
-   define a set of capacities that can be used to extend the capacities explicitly
-   defined in a `CapacityPool`. This allows for reduced duplication if there are many
-   identical physical devices that must be represented as capacity pools. CapacityPoolMixins
-   can not be referenced directly by devices.
+1. The `Mixins` field is of type `ResourceSliceMixin`, which has fields for the three
+   types of mixins available in a ResourceSlice. These are `CapacityPool`,
+   `Device`, and `DeviceCapacityConsumption`.
 
-1. The `DeviceMixins` field is a list of named `DeviceMixin`s. These define
-   attributes and capacities that can be used to extend what is defined
-   explicitly in a `CompositeDevice`. Mixins can not be allocated directly,
-   but can only be referenced by composite devices.
+    1. The `CapacityPool` field defines a list of named `CapacityPoolMixin`s. These
+      define a set of capacities that can be used to extend the capacities explicitly
+      defined in a `CapacityPool`. This allows for reduced duplication if there are many
+      identical physical devices that must be represented as capacity pools. CapacityPoolMixins
+      can not be referenced directly by devices.
+
+    1. The `Device` field is a list of named `DeviceMixin`s. These define
+      attributes and capacities that can be used to extend what is defined
+      explicitly in a `CompositeDevice`. Mixins can not be allocated directly,
+      but can only be referenced by composite devices.
+    
+    1. The `DeviceCapacityConsumption` field defines a list of named 
+       `DeviceCapacityConsumptionMixin`s. These define capacities that can be
+       used to extend the capacity consumption defined explicitly in a
+       `CompositeDevice`. The capacity pool is not specified in the
+       `DeviceCapacityConsumptionMixin`, but rather provided when the mixin
+       is referenced from the device.
 
 1. Introduce a new device type called `CompositeDevice` which has the same
    fields as a `BasicDevice`, plus two more. The first is a field called
@@ -300,14 +308,14 @@ ResourceSlice API:
    called `ConsumesCapacity` and defines the capacity the device will draw
    from the capacity pools.
 
-1. The `Includes` field serves to reference a set of `DeviceMixin`s that a
-   `CompositeDevice` can reference to extend the set of attributes,
-   capacities it defines explicitly.
+    1. The `Includes` field serves to reference a set of `DeviceMixin`s that a
+      `CompositeDevice` can reference to extend the set of attributes,
+      capacities it defines explicitly.
 
-1. The `ConsumesCapacity` field defines the capacities the device
-   will draw from the capacity pool when allocated. Therefore, if this capacity isn't
-   available in the pool, the device can not be allocated. Only references
-   to capacity pools in the same `ResourceSlice` is supported.
+    1. The `ConsumesCapacity` field defines the capacities the device
+      will draw from the capacity pool when allocated. Therefore, if this capacity isn't
+      available in the pool, the device can not be allocated. Only references
+      to capacity pools in the same `ResourceSlice` is supported.
 
 With these additions in place, the scheduler has everything it needs to support
 the dynamic allocation of both full devices and their (possibly overlapping)
@@ -336,7 +344,16 @@ type ResourceSliceSpec struct {
   // listType=atomic
   CapacityPools []CapacityPool
 
-  // DeviceMixins represents a list of device mixins, i.e. a collection of
+  // Mixins defines the mixins available for devices and capacity pools
+  // in the ResourceSlice.
+  //
+  // +optional
+  Mixins ResourceSliceMixins
+}
+
+// ResourceSliceMixins defines mixins for the ResourceSlice.
+type ResourceSliceMixins struct {
+  // Device represents a list of device mixins, i.e. a collection of
   // shared attributes and capacities that an actual device can "include"
   // to extend the set of attributes and capacities it already defines.
   //
@@ -350,9 +367,9 @@ type ResourceSliceSpec struct {
   //
   // +optional
   // +listType=atomic
-  DeviceMixins []DeviceMixin
+  Device []DeviceMixin
 
-  // DeviceCapacityConsumptionMixins represents a list of capacity
+  // DeviceCapacityConsumption represents a list of capacity
   // consumption mixins, each of which contains a set of capacities
   // that a device will consume from a capacity pool.
   //
@@ -367,9 +384,9 @@ type ResourceSliceSpec struct {
   //
   // +optional
   // +listType=atomic
-  DeviceCapacityConsumptionMixins []DeviceCapacityConsumptionMixin
+  DeviceCapacityConsumption []DeviceCapacityConsumptionMixin
 
-  // CapacityPoolMixins represents a list of capacity pool mixins, i.e.
+  // CapacityPool represents a list of capacity pool mixins, i.e.
   // a collection of capacities that a CapacityPool can "include"
   // to extend the set of capacities it already defines.
   //
@@ -383,7 +400,7 @@ type ResourceSliceSpec struct {
   //
   // +optional
   // +listType=atomic
-  CapacityPoolMixins []CapacityPoolMixin
+  CapacityPool []CapacityPoolMixin
 }
 
 // DeviceMixin defines a specific device mixin for each device type.
@@ -514,7 +531,7 @@ type CompositeDevice struct {
   // +optional
   Attributes map[QualifiedName]DeviceAttribute
 
-  // Capacity defines the set of capacities for this mixin.
+  // Capacity defines the set of capacities for this device.
   // The name of each capacity must be unique in that set.
   //
   // To ensure this uniqueness, capacities defined by the vendor
@@ -534,7 +551,7 @@ type CompositeDevice struct {
   // consume from those pools.
   //
   // The capacities can be defined either by referencing one
-  // or more DeviceCapacityConsumptionMixins for by listing
+  // or more DeviceCapacityConsumptionMixins by listing
   // the capacities directly. The latter will always override
   // any capacities coming in from the mixins.
   //
@@ -693,11 +710,6 @@ A simple example the defines a set of mixins and includes them in the
 definition of 4 NVIDIA A100 GPUs can be seen below:
 
 ```yaml
-capacityPoolMixins:
-- name: gpu-pool-mixin
-  capacity:
-    memory: 
-      value: 40Gi
 capacityPools:
 - name: gpu-0-pool
   includes:
@@ -711,36 +723,42 @@ capacityPools:
 - name: gpu-3-pool
   includes:
   - name: gpu-pool-mixin
-deviceMixins:
-- name: system-attributes
-  composite:
-    attributes:
-      cudaDriverVersion:
-        version: 12.6.0
-      driverVersion:
-        version: 560.35.3
-- name: common-gpu-attributes
-  composite:
-    attributes:
-      type:
-        string: gpu
-      architecture:
-        string: Ampere
-      brand:
-        string: Nvidia
-      productName:
-        string: NVIDIA A100-SXM4-40GB
-      cudaComputeCapability:
-        version: 8.0.0
-- name: common-gpu-capacities
-  capacity:
-    memory: 
-      value: 40Gi
-deviceCapacityConsumptionMixins:
-- name: common-gpu-consumption
-  capacity:
-    memory: 
-      value: 40Gi
+mixins:
+  capacityPool:
+  - name: gpu-pool-mixin
+    capacity:
+      memory: 
+        value: 40Gi
+  device:
+  - name: system-attributes
+    composite:
+      attributes:
+        cudaDriverVersion:
+          version: 12.6.0
+        driverVersion:
+          version: 560.35.3
+  - name: common-gpu-attributes
+    composite:
+      attributes:
+        type:
+          string: gpu
+        architecture:
+          string: Ampere
+        brand:
+          string: Nvidia
+        productName:
+          string: NVIDIA A100-SXM4-40GB
+        cudaComputeCapability:
+          version: 8.0.0
+  - name: common-gpu-capacities
+    capacity:
+      memory: 
+        value: 40Gi
+  deviceCapacityConsumption:
+  - name: common-gpu-consumption
+    capacity:
+      memory: 
+        value: 40Gi
 devices:
 - name: gpu-0
   composite:
@@ -841,16 +859,17 @@ capacityPools:
   capacity:
     memory: 
       value: 40Gi
-deviceMixins:
-- name: gpu-partition-capacity
-  capacity:
-    memory: 
-      value: 10Gi
-deviceCapacityConsuptionMixins:
-- name: gpu-partition-consumption
-  capacity:
-    memory: 
-      value: 10Gi
+mixins:
+  device:
+  - name: gpu-partition-capacity
+    capacity:
+      memory: 
+        value: 10Gi
+  deviceCapacityConsumption:
+  - name: gpu-partition-consumption
+    capacity:
+      memory: 
+        value: 10Gi
 devices:
 - name: gpu-0
   composite:
@@ -949,21 +968,36 @@ For example, a capacity pool for an NVIDIA A100 GPU looks as follows:
 capacityPools:
 - name: gpu-0-pool
   capacity:
-    copy-engines: "7"
-    decoders: "5"
-    encoders: "0"
-    jpeg-engines: "1"
-    memory: 40Gi
-    memorySlice0: "1"
-    memorySlice1: "1"
-    memorySlice2: "1"
-    memorySlice3: "1"
-    memorySlice4: "1"
-    memorySlice5: "1"
-    memorySlice6: "1"
-    memorySlice7: "1"
-    multiprocessors: "98"
-    ofa-engines: "1"
+    copy-engines:
+      value: "7"
+    decoders:
+      value: "5"
+    encoders:
+      value: "0"
+    jpeg-engines:
+      value: "1"
+    memory:
+      value: 40Gi
+    memorySlice0:
+      value: "1"
+    memorySlice1:
+      value: "1"
+    memorySlice2:
+      value: "1"
+    memorySlice3:
+      value: "1"
+    memorySlice4:
+      value: "1"
+    memorySlice5:
+      value: "1"
+    memorySlice6:
+      value: "1"
+    memorySlice7:
+      value: "1"
+    multiprocessors:
+      value: "98"
+    ofa-engines:
+      value: "1"
 ```
 
 Three example devices representing MIG partitions can be defined as follows:
@@ -974,14 +1008,22 @@ sharedCapacityPools:
 deviceMixins:
 - name: mig-1g.5gb
   capacity:
-    copy-engines: "1"
-    decoders: "0"
-    encoders: "0"
-    jpeg-engines: "0"
-    memory: 4864Mi
-    memorySlice0: "1"
-    multiprocessors: "14"
-    ofa-engines: "0"
+    copy-engines:
+      value: "1"
+    decoders:
+      value: "0"
+    encoders:
+      value: "0"
+    jpeg-engines:
+      value: "0"
+    memory:
+      value: 4864Mi
+    memorySlice0:
+      value: "1"
+    multiprocessors:
+      value: "14"
+    ofa-engines:
+      value: "0"
   sharedCapacityConsumed:
   - name: copy-engines
     capacity: "1"
@@ -1001,15 +1043,24 @@ deviceMixins:
     capacity: "0"
 - name: mig-2g.10gb
   capacity:
-    copy-engines: "2"
-    decoders: "1"
-    encoders: "0"
-    jpeg-engines: "0"
-    memory: 9856Mi
-    memorySlice0: "1"
-    memorySlice1: "1"
-    multiprocessors: "28"
-    ofa-engines: "0"
+    copy-engines:
+      value: "2"
+    decoders:
+      value: "1"
+    encoders:
+      value: "0"
+    jpeg-engines:
+      value: "0"
+    memory:
+      value: 9856Mi
+    memorySlice0:
+      value: "1"
+    memorySlice1:
+      value: "1"
+    multiprocessors:
+      value: "28"
+    ofa-engines:
+      value: "0"
   sharedCapacityConsumed:
   - name: copy-engines
     capacity: "2"
@@ -1956,6 +2007,11 @@ Start of v1.32 development cycle (v1.32.0-alpha.1-178-gd9c46d8ecb1):
 - `k8s.io/dynamic-resource-allocation/structured`: 82.7%
 - `k8s.io/kubernetes/pkg/controller/resourceclaim`: 70.0%
 - `k8s.io/kubernetes/pkg/scheduler/framework/plugins/dynamicresources`: 72.9%
+
+We also plan to add unit tests to verify that the theoretical maximum size
+of the ResourceSlice resource remains within the size limitations of etcd. As
+the resource has become more complex with additional fields, it has become
+harder to do simple back-of-the-envelope calculations.
 
 ##### Integration tests
 
