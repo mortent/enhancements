@@ -252,10 +252,10 @@ non-goals of this KEP.
 
 ## Proposal
 
-On a high level, this proposal is based around two new concepts:
+At a high level, this proposal is based around two new concepts:
 
 1. Capacity pool, which is a construct for defining the capacities available for
-   sharing among partitions of a single physical device. Drivers/controllers will
+   sharing among partitions of a single physical device. Drivers will
    typically create a capacity pool that specifies all the available capacities of
    a physical device and then define the partitions available for DRA. Each
    partition will specify how much capacity it will consume from the capacity
@@ -287,12 +287,13 @@ mixins.
     1. The `CapacityPool` field defines a list of named `CapacityPoolMixin`s. These
       define a set of capacities that can be used to extend the capacities explicitly
       defined in a `CapacityPool`. This allows for reduced duplication if there are many
-      identical physical devices that must be represented as capacity pools. CapacityPoolMixins
+      identical physical devices that must be represented as capacity pools. `CapacityPoolMixin`s
       can not be referenced directly by devices.
 
     1. The `Device` field is a list of named `DeviceMixin`s. These define
       attributes and capacities that can be used to extend what is defined
-      explicitly in a `CompositeDevice`. Mixins can not be allocated directly,
+      explicitly in a new device type called `CompositeDevice` (introduced
+      in more detail below). Mixins cannot be allocated directly,
       but can only be referenced by composite devices.
     
     1. The `DeviceCapacityConsumption` field defines a list of named 
@@ -924,7 +925,7 @@ advertised resource availability and a device capacity consumption mixin that
 defines the capacity the device draws from the capaity pool. This allows the
 definition of each partition to be quite compact.
 
-After all mixins have been "flattened", the scheduler end up with a list
+After all mixins have been "flattened", the scheduler ends up with a list
 of devices that reference a set of pools. It must track the available capacity
 in all capacity pools as devices gets allocated and deallocated, making sure that
 the committed capacity never exceeds what is available.
