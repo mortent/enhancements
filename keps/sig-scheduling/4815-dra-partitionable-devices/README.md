@@ -1111,36 +1111,1086 @@ allocated together with the third one because they compete on the capacity
 available in the full GPU across its "memorySlice0" and "memorySlice1"
 dimensions respectively.
 
-Note that the use of the two device mixins that reprents the two MIG profiles
+Note that the use of the two device mixins that represents the two MIG profiles
 allows us to define the "shape" of the devices once and use them to define
 the actual devices in just a few lines of yaml.
-Also, since the device mixin representing the profiles doesn't have a
-direct reference to a specific capacity pool, they can be re-used if we wanted
-to represent a second NVIDIA A100.
 
 A comprehensive example of the actual MIG partitions that would be created for
 a 2 GPU DGXA100 server that ties together the concepts of both mixins and
-`ConsumesCapacityFrom` can be seen below.
+capacity pools can be seen below.
 
 ```yaml
-******* WILL BE UPDATED ONCE WE MORE FEEDBACK ON THE DESIGN *******
-deviceMixins:
-- name: common-gpu-nvidia-a100-sxm4-40gb-attributes
-  composite:
-    attributes:
-      architecture:
-        string: Ampere
-      brand:
-        string: Nvidia
-      cudaComputeCapability:
-        string: "8.0"
-      productName:
-        string: NVIDIA A100-SXM4-40GB
-      type:
-        string: gpu
-- name: common-gpu-nvidia-a100-sxm4-40gb-capacities
-  composite:
-    capacity:
+capacityPools:
+- includes:
+  - name: mock-nvidia-a100
+  name: gpu-0-capacity-pool
+- includes:
+  - name: mock-nvidia-a100
+  name: gpu-1-capacity-pool
+devices:
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacity-consumption
+      - name: memory-slices-0-7
+    includes:
+    - name: system-attributes
+    - name: common-gpu-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacities
+    - name: specific-gpu-0-attributes
+    - name: memory-slices-0-7
+  name: gpu-0
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0-1
+  name: gpu-0-mig-1g.10gb-0-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-2-3
+  name: gpu-0-mig-1g.10gb-2-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-4-5
+  name: gpu-0-mig-1g.10gb-4-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-6-7
+  name: gpu-0-mig-1g.10gb-6-7
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0
+  name: gpu-0-mig-1g.5gb-0
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-1
+  name: gpu-0-mig-1g.5gb-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-2
+  name: gpu-0-mig-1g.5gb-2
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-3
+  name: gpu-0-mig-1g.5gb-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-4
+  name: gpu-0-mig-1g.5gb-4
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-5
+  name: gpu-0-mig-1g.5gb-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-6
+  name: gpu-0-mig-1g.5gb-6
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0
+  name: gpu-0-mig-1g.5gb-me-0
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-1
+  name: gpu-0-mig-1g.5gb-me-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-2
+  name: gpu-0-mig-1g.5gb-me-2
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-3
+  name: gpu-0-mig-1g.5gb-me-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-4
+  name: gpu-0-mig-1g.5gb-me-4
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-5
+  name: gpu-0-mig-1g.5gb-me-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-6
+  name: gpu-0-mig-1g.5gb-me-6
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0-1
+  name: gpu-0-mig-2g.10gb-0-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-2-3
+  name: gpu-0-mig-2g.10gb-2-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-4-5
+  name: gpu-0-mig-2g.10gb-4-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0-3
+  name: gpu-0-mig-3g.20gb-0-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-4-7
+  name: gpu-0-mig-3g.20gb-4-7
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0-3
+  name: gpu-0-mig-4g.20gb-0-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-0-capacity-pool
+      includes:
+      - name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-0-mig-attributes
+    - name: memory-slices-0-7
+  name: gpu-0-mig-7g.40gb-0-7
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacity-consumption
+      - name: memory-slices-0-7
+    includes:
+    - name: system-attributes
+    - name: common-gpu-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacities
+    - name: specific-gpu-1-attributes
+    - name: memory-slices-0-7
+  name: gpu-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0-1
+  name: gpu-1-mig-1g.10gb-0-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-2-3
+  name: gpu-1-mig-1g.10gb-2-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-4-5
+  name: gpu-1-mig-1g.10gb-4-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-6-7
+  name: gpu-1-mig-1g.10gb-6-7
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0
+  name: gpu-1-mig-1g.5gb-0
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-1
+  name: gpu-1-mig-1g.5gb-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-2
+  name: gpu-1-mig-1g.5gb-2
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-3
+  name: gpu-1-mig-1g.5gb-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-4
+  name: gpu-1-mig-1g.5gb-4
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-5
+  name: gpu-1-mig-1g.5gb-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-6
+  name: gpu-1-mig-1g.5gb-6
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0
+  name: gpu-1-mig-1g.5gb-me-0
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-1
+  name: gpu-1-mig-1g.5gb-me-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-2
+  name: gpu-1-mig-1g.5gb-me-2
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-3
+  name: gpu-1-mig-1g.5gb-me-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-4
+  name: gpu-1-mig-1g.5gb-me-4
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-5
+  name: gpu-1-mig-1g.5gb-me-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-6
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-6
+  name: gpu-1-mig-1g.5gb-me-6
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-1
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0-1
+  name: gpu-1-mig-2g.10gb-0-1
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-2-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-2-3
+  name: gpu-1-mig-2g.10gb-2-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-5
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-4-5
+  name: gpu-1-mig-2g.10gb-4-5
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0-3
+  name: gpu-1-mig-3g.20gb-0-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-4-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-4-7
+  name: gpu-1-mig-3g.20gb-4-7
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-3
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0-3
+  name: gpu-1-mig-4g.20gb-0-3
+- composite:
+    consumesCapacity:
+    - capacityPool: gpu-1-capacity-pool
+      includes:
+      - name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+      - name: memory-slices-0-7
+    includes:
+    - name: system-attributes
+    - name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+    - name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+    - name: specific-gpu-1-mig-attributes
+    - name: memory-slices-0-7
+  name: gpu-1-mig-7g.40gb-0-7
+mixins:
+  capacityPool:
+  - capacity:
+      copy-engines:
+        quantity: "7"
+      decoders:
+        quantity: "5"
+      encoders:
+        quantity: "0"
+      jpeg-engines:
+        quantity: "1"
+      memory:
+        quantity: 40192Mi
+      memorySlice0:
+        quantity: "1"
+      memorySlice1:
+        quantity: "1"
+      memorySlice2:
+        quantity: "1"
+      memorySlice3:
+        quantity: "1"
+      memorySlice4:
+        quantity: "1"
+      memorySlice5:
+        quantity: "1"
+      memorySlice6:
+        quantity: "1"
+      memorySlice7:
+        quantity: "1"
+      multiprocessors:
+        quantity: "98"
+      ofa-engines:
+        quantity: "1"
+    name: mock-nvidia-a100
+  device:
+  - composite:
+      attributes:
+        architecture:
+          string: Ampere
+        brand:
+          string: Nvidia
+        cudaComputeCapability:
+          string: "8.0"
+        productName:
+          string: Mock NVIDIA A100-SXM4-40GB
+        type:
+          string: gpu
+    name: common-gpu-mock-nvidia-a100-sxm4-40gb-attributes
+  - composite:
+      capacity:
+        copy-engines:
+          quantity: "7"
+        decoders:
+          quantity: "5"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "1"
+        memory:
+          quantity: 40Gi
+        multiprocessors:
+          quantity: "98"
+        ofa-engines:
+          quantity: "1"
+    name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacities
+  - composite:
+      attributes:
+        profile:
+          string: 1g.10gb
+      capacity:
+        copy-engines:
+          quantity: "1"
+        decoders:
+          quantity: "1"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "0"
+        memory:
+          quantity: 9856Mi
+        multiprocessors:
+          quantity: "14"
+        ofa-engines:
+          quantity: "0"
+    name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 1g.5gb+me
+      capacity:
+        copy-engines:
+          quantity: "1"
+        decoders:
+          quantity: "1"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "1"
+        memory:
+          quantity: 4864Mi
+        multiprocessors:
+          quantity: "14"
+        ofa-engines:
+          quantity: "1"
+    name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 1g.5gb
+      capacity:
+        copy-engines:
+          quantity: "1"
+        decoders:
+          quantity: "0"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "0"
+        memory:
+          quantity: 4864Mi
+        multiprocessors:
+          quantity: "14"
+        ofa-engines:
+          quantity: "0"
+    name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 2g.10gb
+      capacity:
+        copy-engines:
+          quantity: "2"
+        decoders:
+          quantity: "1"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "0"
+        memory:
+          quantity: 9856Mi
+        multiprocessors:
+          quantity: "28"
+        ofa-engines:
+          quantity: "0"
+    name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 3g.20gb
+      capacity:
+        copy-engines:
+          quantity: "3"
+        decoders:
+          quantity: "2"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "0"
+        memory:
+          quantity: 19968Mi
+        multiprocessors:
+          quantity: "42"
+        ofa-engines:
+          quantity: "0"
+    name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 4g.20gb
+      capacity:
+        copy-engines:
+          quantity: "4"
+        decoders:
+          quantity: "2"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "0"
+        memory:
+          quantity: 19968Mi
+        multiprocessors:
+          quantity: "56"
+        ofa-engines:
+          quantity: "0"
+    name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        profile:
+          string: 7g.40gb
+      capacity:
+        copy-engines:
+          quantity: "7"
+        decoders:
+          quantity: "5"
+        encoders:
+          quantity: "0"
+        jpeg-engines:
+          quantity: "1"
+        memory:
+          quantity: 40192Mi
+        multiprocessors:
+          quantity: "98"
+        ofa-engines:
+          quantity: "1"
+    name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+  - composite:
+      attributes:
+        architecture:
+          string: Ampere
+        brand:
+          string: Nvidia
+        cudaComputeCapability:
+          string: "8.0"
+        productName:
+          string: Mock NVIDIA A100-SXM4-40GB
+        type:
+          string: mig
+    name: common-mig-mock-nvidia-a100-sxm4-40gb-attributes
+  - composite:
+      capacity:
+        memorySlice0:
+          quantity: "1"
+    name: memory-slices-0
+  - composite:
+      capacity:
+        memorySlice0:
+          quantity: "1"
+        memorySlice1:
+          quantity: "1"
+    name: memory-slices-0-1
+  - composite:
+      capacity:
+        memorySlice0:
+          quantity: "1"
+        memorySlice1:
+          quantity: "1"
+        memorySlice2:
+          quantity: "1"
+        memorySlice3:
+          quantity: "1"
+    name: memory-slices-0-3
+  - composite:
+      capacity:
+        memorySlice0:
+          quantity: "1"
+        memorySlice1:
+          quantity: "1"
+        memorySlice2:
+          quantity: "1"
+        memorySlice3:
+          quantity: "1"
+        memorySlice4:
+          quantity: "1"
+        memorySlice5:
+          quantity: "1"
+        memorySlice6:
+          quantity: "1"
+        memorySlice7:
+          quantity: "1"
+    name: memory-slices-0-7
+  - composite:
+      capacity:
+        memorySlice1:
+          quantity: "1"
+    name: memory-slices-1
+  - composite:
+      capacity:
+        memorySlice2:
+          quantity: "1"
+    name: memory-slices-2
+  - composite:
+      capacity:
+        memorySlice2:
+          quantity: "1"
+        memorySlice3:
+          quantity: "1"
+    name: memory-slices-2-3
+  - composite:
+      capacity:
+        memorySlice3:
+          quantity: "1"
+    name: memory-slices-3
+  - composite:
+      capacity:
+        memorySlice4:
+          quantity: "1"
+    name: memory-slices-4
+  - composite:
+      capacity:
+        memorySlice4:
+          quantity: "1"
+        memorySlice5:
+          quantity: "1"
+    name: memory-slices-4-5
+  - composite:
+      capacity:
+        memorySlice4:
+          quantity: "1"
+        memorySlice5:
+          quantity: "1"
+        memorySlice6:
+          quantity: "1"
+        memorySlice7:
+          quantity: "1"
+    name: memory-slices-4-7
+  - composite:
+      capacity:
+        memorySlice5:
+          quantity: "1"
+    name: memory-slices-5
+  - composite:
+      capacity:
+        memorySlice6:
+          quantity: "1"
+    name: memory-slices-6
+  - composite:
+      capacity:
+        memorySlice6:
+          quantity: "1"
+        memorySlice7:
+          quantity: "1"
+    name: memory-slices-6-7
+  - composite:
+      attributes:
+        index:
+          int: 0
+        minor:
+          int: 0
+        uuid:
+          string: GPU-f27658d7-1427-4974-9dfe-45cc9ca77b34
+    name: specific-gpu-0-attributes
+  - composite:
+      attributes:
+        parentIndex:
+          int: 0
+        parentMinor:
+          int: 0
+        parentUUID:
+          string: GPU-f27658d7-1427-4974-9dfe-45cc9ca77b34
+    name: specific-gpu-0-mig-attributes
+  - composite:
+      attributes:
+        index:
+          int: 1
+        minor:
+          int: 1
+        uuid:
+          string: GPU-e43c1138-8af2-4cfe-af1c-988dbd476754
+    name: specific-gpu-1-attributes
+  - composite:
+      attributes:
+        parentIndex:
+          int: 1
+        parentMinor:
+          int: 1
+        parentUUID:
+          string: GPU-e43c1138-8af2-4cfe-af1c-988dbd476754
+    name: specific-gpu-1-mig-attributes
+  - composite:
+      attributes:
+        cudaDriverVersion:
+          version: "12.4"
+        driverVersion:
+          version: 550.54.15
+    name: system-attributes
+  deviceCapacityConsumption:
+  - capacity:
+      memorySlice1:
+        quantity: "1"
+    name: memory-slices-1
+  - capacity:
+      copy-engines:
+        quantity: "4"
+      decoders:
+        quantity: "2"
+      encoders:
+        quantity: "0"
+      jpeg-engines:
+        quantity: "0"
+      memory:
+        quantity: 19968Mi
+      multiprocessors:
+        quantity: "56"
+      ofa-engines:
+        quantity: "0"
+    name: common-mig-4g.20gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
       copy-engines:
         quantity: "7"
       decoders:
@@ -1155,72 +2205,8 @@ deviceMixins:
         quantity: "98"
       ofa-engines:
         quantity: "1"
-- name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 1g.10gb
-    capacity:
-      copy-engines:
-        quantity: "1"
-      decoders:
-        quantity: "1"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "0"
-      memory:
-        quantity: 9984Mi
-      multiprocessors:
-        quantity: "14"
-      ofa-engines:
-        quantity: "0"
-- name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 1g.5gb+me
-    capacity:
-      copy-engines:
-        quantity: "1"
-      decoders:
-        quantity: "1"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "1"
-      memory:
-        quantity: 4864Mi
-      multiprocessors:
-        quantity: "14"
-      ofa-engines:
-        quantity: "1"
-- name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 1g.5gb
-    capacity:
-      copy-engines:
-        quantity: "1"
-      decoders:
-        quantity: "0"
-      encoders:
-        quantity: "0"
-      jpeg-engines:
-        quantity: "0"
-      memory:
-        quantity: 4864Mi
-      multiprocessors:
-        quantity: "14"
-      ofa-engines:
-        quantity: "0"
-- name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 2g.10gb
-    capacity:
+    name: common-gpu-mock-nvidia-a100-sxm4-40gb-capacity-consumption
+  - capacity:
       copy-engines:
         quantity: "2"
       decoders:
@@ -1230,17 +2216,19 @@ deviceMixins:
       jpeg-engines:
         quantity: "0"
       memory:
-        quantity: 9984Mi
+        quantity: 9856Mi
       multiprocessors:
         quantity: "28"
       ofa-engines:
         quantity: "0"
-- name: common-mig-3g.20gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 3g.20gb
-    capacity:
+    name: common-mig-2g.10gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
+      memorySlice0:
+        quantity: "1"
+      memorySlice1:
+        quantity: "1"
+    name: memory-slices-0-1
+  - capacity:
       copy-engines:
         quantity: "3"
       decoders:
@@ -1250,37 +2238,81 @@ deviceMixins:
       jpeg-engines:
         quantity: "0"
       memory:
-        quantity: 20096Mi
+        quantity: 19968Mi
       multiprocessors:
         quantity: "42"
       ofa-engines:
         quantity: "0"
-- name: common-mig-4g.20gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 4g.20gb
-    capacity:
+    name: common-mig-3g.20gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
       copy-engines:
-        quantity: "4"
+        quantity: "1"
       decoders:
-        quantity: "2"
+        quantity: "1"
       encoders:
         quantity: "0"
       jpeg-engines:
         quantity: "0"
       memory:
-        quantity: 20096Mi
+        quantity: 9856Mi
       multiprocessors:
-        quantity: "56"
+        quantity: "14"
       ofa-engines:
         quantity: "0"
-- name: common-mig-7g.40gb-nvidia-a100-sxm4-40gb
-  composite:
-    attributes:
-      profile:
-        string: 7g.40gb
-    capacity:
+    name: common-mig-1g.10gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
+      memorySlice0:
+        quantity: "1"
+    name: memory-slices-0
+  - capacity:
+      memorySlice3:
+        quantity: "1"
+    name: memory-slices-3
+  - capacity:
+      memorySlice4:
+        quantity: "1"
+    name: memory-slices-4
+  - capacity:
+      memorySlice5:
+        quantity: "1"
+    name: memory-slices-5
+  - capacity:
+      copy-engines:
+        quantity: "1"
+      decoders:
+        quantity: "0"
+      encoders:
+        quantity: "0"
+      jpeg-engines:
+        quantity: "0"
+      memory:
+        quantity: 4864Mi
+      multiprocessors:
+        quantity: "14"
+      ofa-engines:
+        quantity: "0"
+    name: common-mig-1g.5gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
+      memorySlice0:
+        quantity: "1"
+      memorySlice1:
+        quantity: "1"
+      memorySlice2:
+        quantity: "1"
+      memorySlice3:
+        quantity: "1"
+    name: memory-slices-0-3
+  - capacity:
+      memorySlice4:
+        quantity: "1"
+      memorySlice5:
+        quantity: "1"
+      memorySlice6:
+        quantity: "1"
+      memorySlice7:
+        quantity: "1"
+    name: memory-slices-4-7
+  - capacity:
       copy-engines:
         quantity: "7"
       decoders:
@@ -1290,50 +2322,13 @@ deviceMixins:
       jpeg-engines:
         quantity: "1"
       memory:
-        quantity: 40320Mi
+        quantity: 40192Mi
       multiprocessors:
         quantity: "98"
       ofa-engines:
         quantity: "1"
-- name: common-mig-nvidia-a100-sxm4-40gb-attributes
-  composite:
-    attributes:
-      architecture:
-        string: Ampere
-      brand:
-        string: Nvidia
-      cudaComputeCapability:
-        string: "8.0"
-      productName:
-        string: NVIDIA A100-SXM4-40GB
-      type:
-        string: mig
-- name: memory-slices-0
-  composite:
-    capacity:
-      memorySlice0:
-        quantity: "1"
-- name: memory-slices-0-1
-  composite:
-    capacity:
-      memorySlice0:
-        quantity: "1"
-      memorySlice1:
-        quantity: "1"
-- name: memory-slices-0-3
-  composite:
-    capacity:
-      memorySlice0:
-        quantity: "1"
-      memorySlice1:
-        quantity: "1"
-      memorySlice2:
-        quantity: "1"
-      memorySlice3:
-        quantity: "1"
-- name: memory-slices-0-7
-  composite:
-    capacity:
+    name: common-mig-7g.40gb-mock-nvidia-a100-sxm4-40gb
+  - capacity:
       memorySlice0:
         quantity: "1"
       memorySlice1:
@@ -1350,629 +2345,53 @@ deviceMixins:
         quantity: "1"
       memorySlice7:
         quantity: "1"
-- name: memory-slices-1
-  composite:
-    capacity:
-      memorySlice1:
+    name: memory-slices-0-7
+  - capacity:
+      copy-engines:
         quantity: "1"
-- name: memory-slices-2
-  composite:
-    capacity:
-      memorySlice2:
+      decoders:
         quantity: "1"
-- name: memory-slices-2-3
-  composite:
-    capacity:
-      memorySlice2:
+      encoders:
+        quantity: "0"
+      jpeg-engines:
         quantity: "1"
-      memorySlice3:
+      memory:
+        quantity: 4864Mi
+      multiprocessors:
+        quantity: "14"
+      ofa-engines:
         quantity: "1"
-- name: memory-slices-3
-  composite:
-    capacity:
-      memorySlice3:
-        quantity: "1"
-- name: memory-slices-4
-  composite:
-    capacity:
-      memorySlice4:
-        quantity: "1"
-- name: memory-slices-4-5
-  composite:
-    capacity:
-      memorySlice4:
-        quantity: "1"
-      memorySlice5:
-        quantity: "1"
-- name: memory-slices-4-7
-  composite:
-    capacity:
-      memorySlice4:
-        quantity: "1"
-      memorySlice5:
-        quantity: "1"
+    name: common-mig-1g.5gb-me-mock-nvidia-a100-sxm4-40gb
+  - capacity:
       memorySlice6:
         quantity: "1"
       memorySlice7:
         quantity: "1"
-- name: memory-slices-5
-  composite:
-    capacity:
+    name: memory-slices-6-7
+  - capacity:
+      memorySlice2:
+        quantity: "1"
+    name: memory-slices-2
+  - capacity:
+      memorySlice6:
+        quantity: "1"
+    name: memory-slices-6
+  - capacity:
+      memorySlice2:
+        quantity: "1"
+      memorySlice3:
+        quantity: "1"
+    name: memory-slices-2-3
+  - capacity:
+      memorySlice4:
+        quantity: "1"
       memorySlice5:
         quantity: "1"
-- name: memory-slices-6
-  composite:
-    capacity:
-      memorySlice6:
-        quantity: "1"
-- name: memory-slices-6-7
-  composite:
-    capacity:
-      memorySlice6:
-        quantity: "1"
-      memorySlice7:
-        quantity: "1"
-- name: specific-gpu-0-attributes
-  composite:
-    attributes:
-      index:
-        int: 0
-      minor:
-        int: 0
-      uuid:
-        string: GPU-4cf8db2d-06c0-7d70-1a51-e59b25b2c16c
-- name: specific-gpu-0-mig-attributes
-  composite:
-    attributes:
-      parentIndex:
-        int: 0
-      parentMinor:
-        int: 0
-      parentUUID:
-        string: GPU-4cf8db2d-06c0-7d70-1a51-e59b25b2c16c
-- name: specific-gpu-1-attributes
-  composite:
-    attributes:
-      index:
-        int: 1
-      minor:
-        int: 1
-      uuid:
-        string: GPU-4404041a-04cf-1ccf-9e70-f139a9b1e23c
-- name: specific-gpu-1-mig-attributes
-  composite:
-    attributes:
-      parentIndex:
-        int: 1
-      parentMinor:
-        int: 1
-      parentUUID:
-        string: GPU-4404041a-04cf-1ccf-9e70-f139a9b1e23c
-- name: system-attributes
-  composite:
-    attributes:
-      cudaDriverVersion:
-        version: "12.6"
-      driverVersion:
-        version: 560.35.03
-devices:
-- name: gpu-0
-  composite:
-    includes:
-    - name: system-attributes
-    - name: common-gpu-nvidia-a100-sxm4-40gb-attributes
-    - name: common-gpu-nvidia-a100-sxm4-40gb-capacities
-    - name: specific-gpu-0-attributes
-    - name: memory-slices-0-7
-- name: gpu-0-mig-1g.10gb-0-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0-1
-- name: gpu-0-mig-1g.10gb-2-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-2-3
-- name: gpu-0-mig-1g.10gb-4-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-4-5
-- name: gpu-0-mig-1g.10gb-6-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-6-7
-- name: gpu-0-mig-1g.5gb-0
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0
-- name: gpu-0-mig-1g.5gb-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-1
-- name: gpu-0-mig-1g.5gb-2
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-2
-- name: gpu-0-mig-1g.5gb-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-3
-- name: gpu-0-mig-1g.5gb-4
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-4
-- name: gpu-0-mig-1g.5gb-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-5
-- name: gpu-0-mig-1g.5gb-6
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-6
-- name: gpu-0-mig-1g.5gb-me-0
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0
-- name: gpu-0-mig-1g.5gb-me-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-1
-- name: gpu-0-mig-1g.5gb-me-2
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-2
-- name: gpu-0-mig-1g.5gb-me-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-3
-- name: gpu-0-mig-1g.5gb-me-4
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-4
-- name: gpu-0-mig-1g.5gb-me-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-5
-- name: gpu-0-mig-1g.5gb-me-6
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-6
-- name: gpu-0-mig-2g.10gb-0-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0-1
-- name: gpu-0-mig-2g.10gb-2-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-2-3
-- name: gpu-0-mig-2g.10gb-4-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-4-5
-- name: gpu-0-mig-3g.20gb-0-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-3g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0-3
-- name: gpu-0-mig-3g.20gb-4-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-3g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-4-7
-- name: gpu-0-mig-4g.20gb-0-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-4g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0-3
-- name: gpu-0-mig-7g.40gb-0-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-0
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-7g.40gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-0-mig-attributes
-    - name: memory-slices-0-7
-- name: gpu-1
-  composite:
-    includes:
-    - name: system-attributes
-    - name: common-gpu-nvidia-a100-sxm4-40gb-attributes
-    - name: common-gpu-nvidia-a100-sxm4-40gb-capacities
-    - name: specific-gpu-1-attributes
-    - name: memory-slices-0-7
-- name: gpu-1-mig-1g.10gb-0-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0-1
-- name: gpu-1-mig-1g.10gb-2-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-2-3
-- name: gpu-1-mig-1g.10gb-4-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-4-5
-- name: gpu-1-mig-1g.10gb-6-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-6-7
-- name: gpu-1-mig-1g.5gb-0
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0
-- name: gpu-1-mig-1g.5gb-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-1
-- name: gpu-1-mig-1g.5gb-2
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-2
-- name: gpu-1-mig-1g.5gb-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-3
-- name: gpu-1-mig-1g.5gb-4
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-4
-- name: gpu-1-mig-1g.5gb-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-5
-- name: gpu-1-mig-1g.5gb-6
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-6
-- name: gpu-1-mig-1g.5gb-me-0
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0
-- name: gpu-1-mig-1g.5gb-me-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-1
-- name: gpu-1-mig-1g.5gb-me-2
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-2
-- name: gpu-1-mig-1g.5gb-me-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-3
-- name: gpu-1-mig-1g.5gb-me-4
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-4
-- name: gpu-1-mig-1g.5gb-me-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-5
-- name: gpu-1-mig-1g.5gb-me-6
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-1g.5gb-me-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-6
-- name: gpu-1-mig-2g.10gb-0-1
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0-1
-- name: gpu-1-mig-2g.10gb-2-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-2-3
-- name: gpu-1-mig-2g.10gb-4-5
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-2g.10gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-4-5
-- name: gpu-1-mig-3g.20gb-0-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-3g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0-3
-- name: gpu-1-mig-3g.20gb-4-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-3g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-4-7
-- name: gpu-1-mig-4g.20gb-0-3
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-4g.20gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0-3
-- name: gpu-1-mig-7g.40gb-0-7
-  composite:
-    consumesCapacityFrom:
-    - name: gpu-1
-    includes:
-    - name: system-attributes
-    - name: common-mig-nvidia-a100-sxm4-40gb-attributes
-    - name: common-mig-7g.40gb-nvidia-a100-sxm4-40gb
-    - name: specific-gpu-1-mig-attributes
-    - name: memory-slices-0-7
+    name: memory-slices-4-5
 ```
+
+The flattened version of this example can be found
+[here](https://gist.github.com/mortent/ddda505e2499c872549fa831dd2459c4).
 
 ### Test Plan
 
