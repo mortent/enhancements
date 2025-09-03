@@ -197,7 +197,12 @@ The proposal has two parts to it, the definition of mixins and the
 mechanism for referencing mixins from devices and counter sets.
 
 A new `Mixins` field will be added to the `ResourceSliceSpec` as an
-optional field of type `ResourceSliceMixins`. It will have three properties, one for each of the three
+optional field of type `ResourceSliceMixins`. This field will be mutually
+exclusive with the `Devices` field, meaning that a specific instance of
+a `ResourceSlice` will contain either `Mixins` or `Devices`, but not both.
+This is a safe change since the `Devices` field is already optional.
+
+The `Mixins` field will have three properties, one for each of the three
 types of mixins that will be supported:
 
 1. The `CounterSet` field defines a list of named `CounterSetMixins`.
@@ -222,7 +227,8 @@ The mixins are referenced using the same pattern in all three places. The field
 is named `Includes` and will contain a list of references to the mixins. The mixins
 are applied in the order listed, meaning that later mixins will overwrite earlier
 ones in case of conflicts. Properties set directly on the `CounterSet`, `Device` or
-`DeviceCounterConsumption` will always override mixins.
+`DeviceCounterConsumption` will always override mixins. References can only be to
+mixins within the same `ResourcePool`.
 
 1. The `Includes` field on `CounterSet` is a list of references
    to mixins defined in the `CounterSet` field on the `ResourceSliceMixins`.
@@ -247,7 +253,10 @@ still have some consequences worth pointing out here.
 
 The biggest challenge with this change is that it adds a level of
 indirection for the `Device` and `CounterSet` definitions, meaning
-that it gets harder to understand the ResourceSlice objects.
+that it gets harder to understand the ResourceSlice objects. And since
+we require that mixins and devices are in separate ResourceSlice objects,
+users will have to look at multiple `ResourceSlice` objects to understand
+the full specification for devices and counter sets.
 
 We have discussed adding a kubectl command or a plugin that will allow
 users to see the fully flattened versions of a ResourceSlice. But this
@@ -285,11 +294,17 @@ type ResourceSliceSpec struct {
   ...
 
   // Mixins defines the mixins available for devices and counter sets
-  // in the ResourceSlice.
+  // in the ResourcePool.
   //
   // +featureGate=DRAResourceSliceMixins
   // +optional
+  // +oneOf=ResourceSliceType
   Mixins *ResourceSliceMixins
+  
+  // +optional
+	// +listType=atomic
+  // +oneOf=ResourceSliceType  <-- Added
+	Devices []Device `json:"devices" protobuf:"bytes,6,name=devices"`
 }
 
 type CounterSet struct {
@@ -305,7 +320,7 @@ type CounterSet struct {
   // counters from mixins.
   //
   // The mixins referenced here must be defined in the same
-  // ResourceSlice.
+  // ResourcePool.
   //
   // The maximum number of includes is 8.
   //
@@ -325,6 +340,8 @@ type ResourceSliceMixins struct {
   // shared attributes and capacities that an actual device can "include"
   // to extend the set of attributes and capacities it already defines.
   //
+  // The maximum number of device mixins is 128.
+  //
   // +optional
   // +listType=atomic
   Device []DeviceMixin
@@ -332,6 +349,8 @@ type ResourceSliceMixins struct {
   // DeviceCounterConsumption represents a list of counter
   // consumption mixins, each of which contains a set of counters
   // that a device will consume from a counter set.
+  //
+  // The maximum number of device counter consumption mixins is 128.
   //
   // +optional
   // +listType=atomic
@@ -341,6 +360,8 @@ type ResourceSliceMixins struct {
   // a collection of counters that a CounterSet can "include"
   // to extend the set of counters it already defines.
   //
+  // The maximum number of counter set mixins is 128.
+  //
   // +optional
   // +listType=atomic
   CounterSet []CounterSetMixin
@@ -348,7 +369,7 @@ type ResourceSliceMixins struct {
 
 // DeviceMixin defines a mixin that can be referenced from a device.
 type DeviceMixin struct {
-  // Name is a unique identifier among all device mixins in the ResourceSlice.
+  // Name is a unique identifier among all device mixins in the ResourcePool.
   // It must be a DNS label.
   //
   // +required
@@ -361,10 +382,9 @@ type DeviceMixin struct {
   // must be listed without the driver name as domain prefix in
   // their name. All others must be listed with their domain prefix.
   //
-  // The maximum number of attributes and capacities across all devices
-  // and device mixins in a ResourceSlice is 4096. When flattened, the
-  // total number of attributes and capacities for each device must not
-  // exceed 32.
+  // The maximum number of attributes and capacities combined is 32.
+  // The maximum number of attributes and capacities combined in a flattened
+  // device is also 32.
   //
   // +optional
   Attributes map[QualifiedName]DeviceAttribute
@@ -376,10 +396,9 @@ type DeviceMixin struct {
   // must be listed without the driver name as domain prefix in
   // their name. All others must be listed with their domain prefix.
   //
-  // The maximum number of attributes and capacities across all devices
-  // and device mixins in a ResourceSlice is 4096. When flattened, the
-  // total number of attributes and capacities for each device must not
-  // exceed 32.
+  // The maximum number of attributes and capacities combined is 32.
+  // The maximum number of attributes and capacities combined in a flattened
+  // device is also 32.
   //
   // +optional
   Capacity map[QualifiedName]DeviceCapacity
@@ -390,7 +409,7 @@ type DeviceMixin struct {
 // that a device consumes from a counter set.
 type DeviceCounterConsumptionMixin struct {
   // Name is a unique identifier among all device counter consumption
-  // mixins in the ResourceSlice. It must be a DNS label.
+  // mixins in the ResourcePool. It must be a DNS label.
   //
   // +required
   Name string
@@ -398,8 +417,9 @@ type DeviceCounterConsumptionMixin struct {
   // Counters defines a set of counters
   // that a device will consume from a counter set.
   //
-  // The maximum number device counter consumption all device counter consumptions
-  // and device counter consumption mixins in a ResourceSlice is 2048.
+  // The maximum number of consumed counters in a device counter consumption
+  // mixin is 256. The maximm number of consumed counters in a flattened device
+  // counter consumption is also 256.
   //
   // +required
   Counters map[string]Counter
@@ -407,7 +427,7 @@ type DeviceCounterConsumptionMixin struct {
 
 // CounterSetMixin defines a mixin that a capacity pool can include.
 type CounterSetMixin struct {
-  // Name is a unique identifier among all capacity pool mixins in the ResourceSlice.
+  // Name is a unique identifier among all capacity pool mixins in the ResourcePool.
   // It must be a DNS label.
   //
   // +required
@@ -416,8 +436,8 @@ type CounterSetMixin struct {
   // Counters defines the set of counters for this mixin.
   // The name of each counter must be unique in that set and must be a DNS label.
   //
-  // The maximum number of counters across all counter sets and counter set
-  // mixins in a ResourceSlice is 256.
+  // The maximum number of counters in a counter set mixin is 256. The maximum
+  // number of counters in a flattened counter set is also 256.
   //
   // +required
   Counters map[string]Counter
